@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import random
 
 
-@dataclass(slots=True)
+@dataclass()
 class Wind:
     speed_kts: float
     direction_deg: float

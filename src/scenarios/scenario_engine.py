@@ -6,7 +6,7 @@ from .atc import ATCController, ATCMessage
 from .failures import FailureManager, SystemFailure
 
 
-@dataclass(slots=True)
+@dataclass()
 class ScenarioEvent:
     trigger_time_sec: float
     event_type: str

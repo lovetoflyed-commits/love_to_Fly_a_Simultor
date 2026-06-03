@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import math
 
 
-@dataclass(slots=True)
+@dataclass()
 class Attitude:
     pitch_deg: float = 0.0
     roll_deg: float = 0.0

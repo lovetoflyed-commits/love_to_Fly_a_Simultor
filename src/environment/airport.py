@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from ..models.position import Position
 
 
-@dataclass(slots=True)
+@dataclass()
 class Runway:
     name: str
     heading_deg: float
@@ -15,7 +15,7 @@ class Runway:
     elevation_ft: int
 
 
-@dataclass(slots=True)
+@dataclass()
 class Airport:
     icao: str
     name: str

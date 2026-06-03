@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
-@dataclass(slots=True)
+@dataclass()
 class Aircraft:
     name: str
     max_thrust_N: float

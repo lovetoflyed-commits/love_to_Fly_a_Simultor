@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from ..models.flight_plan import FlightPlan
 
 
-@dataclass(slots=True)
+@dataclass()
 class ATCMessage:
     time_sec: float
     sender: str

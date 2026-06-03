@@ -6,6 +6,8 @@ from .attitude_indicator import AttitudeIndicator
 from .engine_instruments import EngineInstruments
 from .heading_indicator import HeadingIndicator
 from .nav_display import NavDisplay
+from .tachometer import Tachometer
+from .turn_coordinator import TurnCoordinator
 from .vsi import VSI
 
 __all__ = [
@@ -15,5 +17,7 @@ __all__ = [
     "EngineInstruments",
     "HeadingIndicator",
     "NavDisplay",
+    "Tachometer",
+    "TurnCoordinator",
     "VSI",
 ]

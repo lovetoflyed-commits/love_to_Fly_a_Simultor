@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 
-@dataclass(slots=True)
+@dataclass()
 class LogEntry:
     date: str
     aircraft: str
