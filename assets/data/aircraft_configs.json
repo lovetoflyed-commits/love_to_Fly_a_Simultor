@@ -1,0 +1,24 @@
+{
+  "C172": {
+    "name": "Cessna 172",
+    "max_thrust_N": 10000,
+    "mass_kg": 1100,
+    "wing_area_m2": 16.2,
+    "max_fuel_kg": 180,
+    "cl_max": 1.5,
+    "cd_zero": 0.025,
+    "aspect_ratio": 7.32,
+    "oswald_efficiency": 0.75
+  },
+  "B737": {
+    "name": "Boeing 737-800",
+    "max_thrust_N": 240000,
+    "mass_kg": 65000,
+    "wing_area_m2": 125.0,
+    "max_fuel_kg": 20000,
+    "cl_max": 2.8,
+    "cd_zero": 0.018,
+    "aspect_ratio": 9.45,
+    "oswald_efficiency": 0.82
+  }
+}
