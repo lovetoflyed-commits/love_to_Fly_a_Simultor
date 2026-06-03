@@ -291,7 +291,7 @@ class CockpitView:
 
     def _draw_yoke(self, screen: pygame.Surface) -> None:
         """Simple yoke shape at the bottom centre of the cockpit panel."""
-        cx, cy = self.width // 4, self.height - 26
+        cx, cy = self.width // 2, self.height - 26
         yoke_color = (35, 35, 35)
         # Column (vertical rod)
         pygame.draw.rect(screen, yoke_color, pygame.Rect(cx - 7, cy - 30, 14, 32), border_radius=4)

@@ -83,8 +83,8 @@ class Tachometer(Instrument):
         pygame.draw.line(self.surface, (255, 80, 80), center, tip, 3)
         pygame.draw.circle(self.surface, (255, 80, 80), center, 5)
 
-        # Centre label
-        unit_lbl = self.small_font.render("RPM \u00d7100", True, (175, 175, 175))
+        # Centre label — ticks are labelled ×100 (e.g. "5" means 500 RPM)
+        unit_lbl = self.small_font.render("RPM", True, (175, 175, 175))
         self.surface.blit(unit_lbl, unit_lbl.get_rect(center=(center.x, center.y + 30)))
         digital = self.large_font.render(f"{int(self.rpm):4d}", True, (255, 255, 255))
         self.surface.blit(digital, digital.get_rect(center=(center.x, center.y + 48)))
