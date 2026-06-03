@@ -48,6 +48,8 @@ class AirportDatabase:
     @staticmethod
     def _build_airports() -> list[Airport]:
         return [
+            Airport("SBGR", "Sao Paulo/Guarulhos Intl", -23.4356, -46.4731, 2459, [Runway("10L", 100, -23.4407, -46.4868, 9843, 2459), Runway("10R", 100, -23.4250, -46.4850, 12139, 2459)]),
+            Airport("SBSP", "Sao Paulo/Congonhas", -23.6261, -46.6564, 2631, [Runway("17R", 170, -23.6222, -46.6545, 6365, 2631), Runway("17L", 170, -23.6201, -46.6509, 6365, 2631)]),
             Airport("KSFO", "San Francisco Intl", 37.6188056, -122.3754167, 13, [Runway("28L", 284, 37.6136, -122.3572, 11870, 13), Runway("28R", 284, 37.6195, -122.3738, 11870, 13)]),
             Airport("KLAX", "Los Angeles Intl", 33.9425, -118.4081, 125, [Runway("25L", 251, 33.9427, -118.4210, 12091, 125), Runway("25R", 251, 33.9435, -118.4079, 11095, 125)]),
             Airport("KORD", "Chicago O'Hare Intl", 41.9742, -87.9073, 672, [Runway("27C", 271, 41.9786, -87.9048, 11000, 672)]),

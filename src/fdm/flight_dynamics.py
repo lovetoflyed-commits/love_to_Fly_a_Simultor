@@ -19,7 +19,7 @@ MPS_TO_FPM = 196.850394
 
 @dataclass
 class FlightDynamics:
-    position: Position = field(default_factory=lambda: Position(37.619, -122.375, 0.0))
+    position: Position = field(default_factory=lambda: Position(-23.4356, -46.4731, 2459.0))
     attitude: Attitude = field(default_factory=Attitude)
     velocity_body_ms: list[float] = field(default_factory=lambda: [35.0, 0.0, 0.0])
     climb_rate_ms: float = 0.0

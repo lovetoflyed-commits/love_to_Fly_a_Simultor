@@ -1,5 +1,27 @@
 [
   {
+    "icao": "SBGR",
+    "name": "Sao Paulo/Guarulhos Intl",
+    "lat": -23.4356,
+    "lon": -46.4731,
+    "elevation_ft": 2459,
+    "runways": [
+      {"name": "10L", "heading_deg": 100, "threshold_lat": -23.4407, "threshold_lon": -46.4868, "length_ft": 9843, "elevation_ft": 2459},
+      {"name": "10R", "heading_deg": 100, "threshold_lat": -23.4250, "threshold_lon": -46.4850, "length_ft": 12139, "elevation_ft": 2459}
+    ]
+  },
+  {
+    "icao": "SBSP",
+    "name": "Sao Paulo/Congonhas",
+    "lat": -23.6261,
+    "lon": -46.6564,
+    "elevation_ft": 2631,
+    "runways": [
+      {"name": "17R", "heading_deg": 170, "threshold_lat": -23.6222, "threshold_lon": -46.6545, "length_ft": 6365, "elevation_ft": 2631},
+      {"name": "17L", "heading_deg": 170, "threshold_lat": -23.6201, "threshold_lon": -46.6509, "length_ft": 6365, "elevation_ft": 2631}
+    ]
+  },
+  {
     "icao": "KSFO",
     "name": "San Francisco Intl",
     "lat": 37.6188056,
