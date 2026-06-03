@@ -32,7 +32,13 @@ def test_autopilot_heading_mode_commands_bank() -> None:
     assert controls["aileron"] > 0
 
 
-def test_default_start_region_is_brazil_and_nearest_airport_sbgr() -> None:
+def test_default_start_position_is_in_brazil() -> None:
+    fdm = FlightDynamics()
+    assert -34.0 <= fdm.position.latitude_deg <= 6.0
+    assert -74.0 <= fdm.position.longitude_deg <= -34.0
+
+
+def test_default_start_nearest_airport_is_sbgr() -> None:
     fdm = FlightDynamics()
     nearest = AirportDatabase().nearest_airport(fdm.position, 30.0)
     assert nearest is not None
@@ -46,6 +52,9 @@ def test_default_flight_plan_targets_sbgr_runway_10r() -> None:
 
 
 def test_default_approach_procedure_is_sbgr_ils_10r() -> None:
-    procedure = ProcedureDatabase().get_approaches("SBGR")[0]
+    approaches = ProcedureDatabase().get_approaches("SBGR")
+    assert approaches
+    procedure = next((item for item in approaches if item.name == "ILS RWY 10R"), None)
+    assert procedure is not None
     assert procedure.name == "ILS RWY 10R"
     assert procedure.waypoints[-1].name == "RW10R"
