@@ -28,9 +28,17 @@ class Checklist:
 
 
 BEFORE_TAKEOFF = [
+    ChecklistItem("Parking brake set"),
+    ChecklistItem("Fuel shutoff valve in"),
+    ChecklistItem("Master switch ON"),
+    ChecklistItem("Mixture RICH"),
+    ChecklistItem("Magnetos BOTH"),
+    ChecklistItem("Starter engage, then release"),
+    ChecklistItem("Oil pressure check"),
+    ChecklistItem("Avionics switch ON"),
+    ChecklistItem("Run-up 1700 RPM, mags checked"),
     ChecklistItem("Flight controls free and correct"),
     ChecklistItem("Instruments set and checked"),
-    ChecklistItem("Trim set for takeoff"),
     ChecklistItem("Departure briefing complete"),
 ]
 CRUISE = [ChecklistItem("Power set"), ChecklistItem("Mixture adjusted"), ChecklistItem("Fuel balance checked")]

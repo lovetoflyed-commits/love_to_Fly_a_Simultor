@@ -89,7 +89,7 @@ def main() -> None:
     airport_db = AirportDatabase()
     failure_manager = FailureManager()
     logbook = Logbook()
-    checklist = Checklist("Before Takeoff", BEFORE_TAKEOFF)
+    checklist = Checklist("Engine Start / Before Takeoff", BEFORE_TAKEOFF)
     cockpit = CockpitView(1280, 720)
     hud = HUD()
     gps = GPS()
@@ -104,7 +104,15 @@ def main() -> None:
     atc.generate_clearance(flight_plan)
     procedures.get_approaches("SBGR")
 
-    throttle_pct = 55.0
+    throttle_pct = 0.0
+    master_on = False
+    avionics_on = False
+    mixture_pct = 100.0
+    carb_heat_on = False
+    magneto_positions = ["OFF", "R", "L", "BOTH"]
+    magneto_index = 0
+    starter_time_remaining = 0.0
+    dg_heading_deg = fdm.attitude.yaw_deg
     user_controls = {"elevator": 0.0, "aileron": 0.0, "rudder": 0.0}
     running = True
     while running:
@@ -128,12 +136,42 @@ def main() -> None:
                     autopilot.engage(APMode.OFF)
                 elif event.key == pygame.K_SPACE:
                     checklist.advance()
+                elif event.key == pygame.K_m:
+                    master_on = not master_on
+                    if not master_on:
+                        avionics_on = False
+                elif event.key == pygame.K_n:
+                    if master_on:
+                        avionics_on = not avionics_on
+                elif event.key == pygame.K_r:
+                    magneto_index = (magneto_index + 1) % len(magneto_positions)
+                elif event.key == pygame.K_s:
+                    starter_time_remaining = 0.8
+                elif event.key == pygame.K_PERIOD:
+                    mixture_pct = min(100.0, mixture_pct + 10.0)
+                elif event.key == pygame.K_COMMA:
+                    mixture_pct = max(0.0, mixture_pct - 10.0)
+                elif event.key == pygame.K_c:
+                    carb_heat_on = not carb_heat_on
 
         keys = pygame.key.get_pressed()
         user_controls["elevator"] = float(keys[pygame.K_DOWN]) - float(keys[pygame.K_UP])
         user_controls["aileron"] = float(keys[pygame.K_RIGHT]) - float(keys[pygame.K_LEFT])
         user_controls["rudder"] = float(keys[pygame.K_x]) - float(keys[pygame.K_z])
         throttle_pct = min(100.0, max(0.0, throttle_pct + (float(keys[pygame.K_EQUALS]) - float(keys[pygame.K_MINUS])) * 25.0 * dt))
+        if not master_on:
+            avionics_on = False
+        starter_time_remaining = max(0.0, starter_time_remaining - dt)
+
+        engine.set_controls(
+            master_on=master_on,
+            avionics_on=avionics_on,
+            magneto_position=magneto_positions[magneto_index],
+            mixture_pct=mixture_pct,
+            carb_heat_on=carb_heat_on,
+            starter_engaged=starter_time_remaining > 0.0,
+        )
+        engine.update_system_state(aircraft.fuel_kg)
 
         state = {
             "heading_deg": fdm.attitude.yaw_deg,
@@ -153,11 +191,26 @@ def main() -> None:
         fdm_state = fdm.update(dt, controls, aircraft, atmosphere, aerodynamics, engine, weather)
         gps.update(fdm.position, flight_plan, dt)
         scenario_engine.update(fdm_state, dt)
+        if engine.suction_inhg >= 3.5:
+            heading_error = ((fdm.attitude.yaw_deg - dg_heading_deg + 540.0) % 360.0) - 180.0
+            dg_heading_deg = (dg_heading_deg + heading_error * min(1.0, dt * 0.7) + dt * 0.03) % 360.0
 
         next_waypoint = flight_plan.active_waypoint().name if flight_plan.active_waypoint() else "---"
         nearest = airport_db.nearest_airport(fdm.position, 30.0)
+        instrument_heading = failure_manager.modify_instrument_reading("heading_indicator", dg_heading_deg)
+        instrument_pitch = failure_manager.modify_instrument_reading("attitude_indicator", fdm_state["pitch_deg"])
+        instrument_roll = failure_manager.modify_instrument_reading("attitude_indicator", fdm_state["roll_deg"])
+        instrument_airspeed = failure_manager.modify_instrument_reading("airspeed_indicator", fdm_state["airspeed_kts"])
+        instrument_altitude = failure_manager.modify_instrument_reading("altimeter", fdm_state["altitude_ft"])
+        instrument_vsi = failure_manager.modify_instrument_reading("vsi", fdm_state["vertical_speed_fpm"])
         state = {
             **fdm_state,
+            "heading_deg": instrument_heading,
+            "pitch_deg": instrument_pitch,
+            "roll_deg": instrument_roll,
+            "airspeed_kts": instrument_airspeed,
+            "altitude_ft": instrument_altitude,
+            "vertical_speed_fpm": instrument_vsi,
             "position": fdm.position,
             "waypoints": flight_plan.waypoints,
             "active_leg": flight_plan.active_leg,
@@ -169,9 +222,18 @@ def main() -> None:
             "rpm": engine.rpm,
             "fuel_kg": aircraft.fuel_kg,
             "max_fuel_kg": aircraft.max_fuel_kg,
-            "oil_pressure_psi": 60.0 if aircraft.fuel_kg > 0 else 20.0,
-            "oil_temp_c": 60.0 + engine.rpm / 2750.0 * 90.0,
+            "oil_pressure_psi": 55.0 + (engine.rpm / 2750.0) * 28.0 if engine.engine_running else 10.0,
+            "oil_temp_c": 45.0 + engine.rpm / 2750.0 * 80.0 if engine.engine_running else 35.0,
             "egt_c": 500.0 + engine.n1_pct * 2.0,
+            "suction_inhg": engine.suction_inhg,
+            "bus_voltage_v": engine.bus_voltage_v,
+            "master_on": master_on,
+            "avionics_on": avionics_on,
+            "avionics_powered": engine.avionics_powered,
+            "engine_running": engine.engine_running,
+            "magneto_position": magneto_positions[magneto_index],
+            "mixture_pct": mixture_pct,
+            "carb_heat_on": carb_heat_on,
             "baro_inhg": 29.92,
             "next_waypoint": next_waypoint,
             "atc_messages": scenario_engine.get_active_messages(),

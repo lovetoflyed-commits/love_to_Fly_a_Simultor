@@ -89,6 +89,12 @@ class CockpitView:
         self.checklist_status = "Checklist idle"
         self._pitch_deg = 0.0
         self._roll_deg = 0.0
+        self._master_on = True
+        self._avionics_on = True
+        self._avionics_powered = True
+        self._mixture_pct = 100.0
+        self._carb_heat_on = False
+        self._magneto_position = "BOTH"
 
     # ── Public API ─────────────────────────────────────────────────────────
 
@@ -99,7 +105,24 @@ class CockpitView:
             inst.update(state)  # type: ignore[attr-defined]
         self.tachometer.update(state)
         self.engine.update(state)
-        self.nav_display.update(state)
+        self._avionics_powered = bool(state.get("avionics_powered", True))
+        if self._avionics_powered:
+            self.nav_display.update(state)
+        else:
+            self.nav_display.update(
+                {
+                    "position": state.get("position"),
+                    "waypoints": [],
+                    "active_leg": 0,
+                    "bearing_to_next_deg": 0.0,
+                    "distance_to_next_nm": 0.0,
+                }
+            )
+        self._master_on = bool(state.get("master_on", True))
+        self._avionics_on = bool(state.get("avionics_on", True))
+        self._mixture_pct = float(state.get("mixture_pct", 100.0))
+        self._carb_heat_on = bool(state.get("carb_heat_on", False))
+        self._magneto_position = str(state.get("magneto_position", "BOTH")).upper()
         self.atc_messages = [
             m.text if hasattr(m, "text") else str(m)
             for m in state.get("atc_messages", [])
@@ -276,12 +299,20 @@ class CockpitView:
         pygame.draw.rect(screen, (55, 55, 55),
                          pygame.Rect(_RADIO_X, _RADIO_Y, _RADIO_W, _RADIO_H),
                          1, border_radius=4)
-        labels = [
-            ("COM1", "122.800", (0, 185, 255)),
-            ("NAV1", "110.30",  (100, 230, 100)),
-            ("XPDR", "1200",    (230, 200, 100)),
-            ("ADF",  "400.0",   (220, 180, 220)),
-        ]
+        if self._avionics_powered:
+            labels = [
+                ("COM1", "122.800", (0, 185, 255)),
+                ("NAV1", "110.30",  (100, 230, 100)),
+                ("XPDR", "1200",    (230, 200, 100)),
+                ("ADF",  "400.0",   (220, 180, 220)),
+            ]
+        else:
+            labels = [
+                ("COM1", "OFF", (120, 120, 120)),
+                ("NAV1", "OFF", (120, 120, 120)),
+                ("XPDR", "OFF", (120, 120, 120)),
+                ("ADF", "OFF", (120, 120, 120)),
+            ]
         item_h = _RADIO_H // len(labels)
         for i, (name, freq, color) in enumerate(labels):
             y = _RADIO_Y + i * item_h
@@ -324,3 +355,12 @@ class CockpitView:
             screen.blit(t, (8 + idx * (self.width // 3), strip_y + 2))
         ck = self.info_font.render(self.checklist_status, True, (245, 210, 110))
         screen.blit(ck, (self.width - ck.get_width() - 8, strip_y + 2))
+        system_text = (
+            f"MSTR {'ON' if self._master_on else 'OFF'}  "
+            f"AVN {'ON' if self._avionics_on else 'OFF'}  "
+            f"MAG {self._magneto_position}  "
+            f"MIX {self._mixture_pct:03.0f}%  "
+            f"CARB {'HOT' if self._carb_heat_on else 'COLD'}"
+        )
+        sys_surface = self.info_font.render(system_text, True, (180, 180, 180))
+        screen.blit(sys_surface, (8, strip_y - 16))
