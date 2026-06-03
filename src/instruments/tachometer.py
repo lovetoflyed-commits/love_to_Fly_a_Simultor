@@ -12,6 +12,7 @@ class Tachometer(Instrument):
     Green arc: 1700–2750 RPM (normal operating range).
     Red arc: 2750–3000 RPM (do-not-exceed).
     Scale: 270° sweep, 0 RPM at bottom-left, 3000 RPM at bottom-right.
+    Tick labels show × 100 RPM (e.g. "5" = 500 RPM).
     """
 
     MAX_RPM = 3000
@@ -51,42 +52,56 @@ class Tachometer(Instrument):
     def draw(self) -> pygame.Surface:
         self.surface.fill((0, 0, 0, 0))
         self._draw_circle_bg(self.surface, self.bg_color)
-        center = pygame.Vector2(self.width / 2, self.height / 2)
+        cx = self.width / 2
+        cy = self.height / 2
+        center = (cx, cy)
         radius = min(self.width, self.height) // 2 - 12
 
         # Coloured arcs
-        self._draw_arc_range((0, 175, 65), self.GREEN_START_RPM, self.REDLINE_RPM, radius - 1, 6)
-        self._draw_arc_range((215, 40, 40), self.REDLINE_RPM, self.MAX_RPM, radius - 1, 6)
+        self._draw_arc_range((0, 185, 75), self.GREEN_START_RPM, self.REDLINE_RPM, radius - 1, 7)
+        self._draw_arc_range((215, 40, 40), self.REDLINE_RPM, self.MAX_RPM, radius - 1, 7)
 
-        # Tick marks and labels
+        # Tick marks and labels (every 100 RPM, major every 500)
         for rpm in range(0, self.MAX_RPM + 1, 100):
             angle = math.radians(self._rpm_to_angle_deg(rpm))
             major = rpm % 500 == 0
-            inner_r = radius - (16 if major else 7)
-            ox = center.x + math.cos(angle) * radius
-            oy = center.y - math.sin(angle) * radius
-            ix = center.x + math.cos(angle) * inner_r
-            iy = center.y - math.sin(angle) * inner_r
-            pygame.draw.line(self.surface, (255, 255, 255), (ox, oy), (ix, iy), 2 if major else 1)
+            mid = rpm % 500 == 250
+            inner_r = radius - (17 if major else (10 if mid else 6))
+            ox = cx + math.cos(angle) * radius
+            oy = cy - math.sin(angle) * radius
+            ix = cx + math.cos(angle) * inner_r
+            iy = cy - math.sin(angle) * inner_r
+            lw = 2 if major else 1
+            pygame.draw.line(self.surface, (255, 255, 255), (ox, oy), (ix, iy), lw)
             if major and rpm > 0:
                 lbl = self.small_font.render(str(rpm // 100), True, (215, 215, 215))
-                lx = center.x + math.cos(angle) * (radius - 28) - lbl.get_width() / 2
-                ly = center.y - math.sin(angle) * (radius - 28) - lbl.get_height() / 2
+                lx = cx + math.cos(angle) * (radius - 28) - lbl.get_width() / 2
+                ly = cy - math.sin(angle) * (radius - 28) - lbl.get_height() / 2
                 self.surface.blit(lbl, (lx, ly))
+
+        # × 100 RPM label
+        x100_lbl = self.small_font.render("× 100 RPM", True, (140, 140, 140))
+        self.surface.blit(x100_lbl, x100_lbl.get_rect(center=(int(cx), int(cy) + 20)))
 
         # Needle
         angle = math.radians(self._rpm_to_angle_deg(self.rpm))
-        tip = (
-            center.x + math.cos(angle) * (radius - 15),
-            center.y - math.sin(angle) * (radius - 15),
+        self._draw_needle(
+            self.surface, center, angle,
+            length=radius - 13, width=4,
+            color=(255, 255, 255), tail_length=radius * 0.20, tail_color=(80, 80, 80),
         )
-        pygame.draw.line(self.surface, (255, 80, 80), center, tip, 3)
-        pygame.draw.circle(self.surface, (255, 80, 80), center, 5)
+        # Red tip on upper portion
+        tip_len = radius - 13
+        tip_x = cx + math.cos(angle) * tip_len
+        tip_y = cy - math.sin(angle) * tip_len
+        mid_x = cx + math.cos(angle) * (radius * 0.45)
+        mid_y = cy - math.sin(angle) * (radius * 0.45)
+        pygame.draw.line(self.surface, (220, 55, 55), (mid_x, mid_y), (tip_x, tip_y), 2)
 
-        # Centre label — ticks are labelled ×100 (e.g. "5" means 500 RPM)
-        unit_lbl = self.small_font.render("RPM", True, (175, 175, 175))
-        self.surface.blit(unit_lbl, unit_lbl.get_rect(center=(center.x, center.y + 30)))
+        # Digital RPM readout
         digital = self.large_font.render(f"{int(self.rpm):4d}", True, (255, 255, 255))
-        self.surface.blit(digital, digital.get_rect(center=(center.x, center.y + 48)))
+        self.surface.blit(digital, digital.get_rect(center=(int(cx), int(cy) + 44)))
 
+        self._draw_pivot_cap(self.surface, center, radius=6)
         return self.surface
+

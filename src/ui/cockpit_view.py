@@ -21,8 +21,8 @@ _GLARESHIELD_H = 28        # dark bar below windshield
 _PANEL_TOP = _WINDSHIELD_H + _GLARESHIELD_H   # y=290
 
 _INST_SIZE = 150           # square instrument diameter (px)
-_ROW1_Y = _PANEL_TOP + 5   # top edge of first instrument row
-_ROW2_Y = _ROW1_Y + _INST_SIZE + 12  # second row
+_ROW1_Y = _PANEL_TOP + 8   # top edge of first instrument row
+_ROW2_Y = _ROW1_Y + _INST_SIZE + 14  # second row
 
 _COL_ASI = 45
 _COL_AI = 210
@@ -40,7 +40,7 @@ _ENGINE_H = 162
 
 _RADIO_X = 740
 _RADIO_Y = _PANEL_TOP
-_RADIO_W = 175
+_RADIO_W = 178
 _RADIO_H = _ENGINE_Y + _ENGINE_H - _PANEL_TOP
 
 _NAV_X = 930
@@ -52,11 +52,16 @@ _CDI_X = _NAV_X
 _CDI_Y = _NAV_Y + _NAV_H + 20   # directly below nav display
 _CDI_H = 80                       # height of CDI strip
 
-_CESSNA_GRAY = (68, 68, 68)
-_BEZEL_COLOR = (38, 38, 38)
-_GLARESHIELD_COLOR = (22, 22, 22)
-_PILLAR_COLOR = (30, 30, 30)
-_LABEL_COLOR = (175, 175, 175)
+# Panel colours
+_CESSNA_GRAY = (58, 60, 62)          # realistic Cessna panel dark grey
+_PANEL_HIGHLIGHT = (75, 77, 80)       # lighter edge for 3-D effect
+_PANEL_SHADOW = (40, 40, 42)          # darker edge for 3-D effect
+_BEZEL_COLOR = (30, 30, 32)
+_BEZEL_HIGHLIGHT = (65, 65, 68)
+_GLARESHIELD_COLOR = (18, 18, 18)
+_PILLAR_COLOR = (28, 28, 28)
+_LABEL_COLOR = (170, 172, 175)
+_SECTION_LINE = (50, 52, 54)         # subtle divider lines between panel zones
 
 
 class CockpitView:
@@ -67,9 +72,9 @@ class CockpitView:
             pygame.font.init()
         self.width = screen_width
         self.height = screen_height
-        self.label_font = pygame.font.SysFont("arial", 11)
-        self.info_font = pygame.font.SysFont("arial", 13)
-        self.radio_font = pygame.font.SysFont("courier", 12)
+        self.label_font = pygame.font.SysFont("arial", 10)
+        self.info_font = pygame.font.SysFont("arial", 12)
+        self.radio_font = pygame.font.SysFont("courier", 12, bold=True)
 
         # ── Six-pack + tachometer + TC ──────────────────────────────────
         self.airspeed = AirspeedIndicator(_INST_SIZE, _INST_SIZE)
@@ -450,134 +455,259 @@ class CockpitView:
         )
 
     def _draw_glareshield(self, screen: pygame.Surface) -> None:
-        pygame.draw.rect(
-            screen, _GLARESHIELD_COLOR,
-            pygame.Rect(0, _WINDSHIELD_H, self.width, _GLARESHIELD_H),
-        )
+        """Dark matte glareshield strip below the windshield."""
+        # Gradient: slightly lighter at the top (catching light from sky)
+        for y in range(_GLARESHIELD_H):
+            t = 1.0 - y / _GLARESHIELD_H
+            shade = int(18 + t * 14)
+            pygame.draw.line(screen, (shade, shade, shade),
+                             (0, _WINDSHIELD_H + y), (self.width, _WINDSHIELD_H + y))
+        # Thin highlight at the very top of glareshield
+        pygame.draw.line(screen, (45, 45, 45),
+                         (0, _WINDSHIELD_H), (self.width, _WINDSHIELD_H), 1)
 
     def _draw_panel_background(self, screen: pygame.Surface) -> None:
-        pygame.draw.rect(
-            screen, _CESSNA_GRAY,
-            pygame.Rect(0, _PANEL_TOP, self.width, self.height - _PANEL_TOP),
-        )
+        panel_rect = pygame.Rect(0, _PANEL_TOP, self.width, self.height - _PANEL_TOP)
+        # Subtle vertical gradient: slightly lighter at top (glareshield edge)
+        for y in range(panel_rect.height):
+            t = y / max(1, panel_rect.height)
+            r = int(_CESSNA_GRAY[0] - t * 8)
+            g = int(_CESSNA_GRAY[1] - t * 8)
+            b = int(_CESSNA_GRAY[2] - t * 8)
+            pygame.draw.line(screen, (r, g, b),
+                             (0, _PANEL_TOP + y), (self.width, _PANEL_TOP + y))
+        # Top highlight line (bright edge where glareshield meets panel)
+        pygame.draw.line(screen, _PANEL_HIGHLIGHT,
+                         (0, _PANEL_TOP), (self.width, _PANEL_TOP), 2)
+        # Bottom shadow line
+        pygame.draw.line(screen, _PANEL_SHADOW,
+                         (0, self.height - 1), (self.width, self.height - 1), 2)
 
     def _draw_panel_details(self, screen: pygame.Surface) -> None:
-        """Recessed bezel areas for the instrument clusters."""
+        """Recessed bezel areas for the instrument clusters with 3-D shadow/highlight."""
+        recess_margin = 7
+
+        def draw_bezel(rect: pygame.Rect) -> None:
+            """Draw a recessed instrument bay with shadow/highlight edges."""
+            # Fill
+            pygame.draw.rect(screen, _BEZEL_COLOR, rect, border_radius=7)
+            # Shadow on top + left edges (light comes from top-left)
+            pygame.draw.line(screen, (15, 15, 15), rect.topleft, rect.topright, 2)
+            pygame.draw.line(screen, (15, 15, 15), rect.topleft, rect.bottomleft, 2)
+            # Highlight on bottom + right edges
+            pygame.draw.line(screen, _BEZEL_HIGHLIGHT, rect.bottomleft, rect.bottomright, 1)
+            pygame.draw.line(screen, _BEZEL_HIGHLIGHT, rect.topright, rect.bottomright, 1)
+            # Outer outline
+            pygame.draw.rect(screen, (20, 20, 20), rect, 1, border_radius=7)
+
         # Six-pack recess
-        recess_margin = 6
         r1 = pygame.Rect(
             _COL_ASI - recess_margin,
             _ROW1_Y - recess_margin,
             (_COL_ALT - _COL_ASI) + _INST_SIZE + recess_margin * 2,
             (_ROW2_Y - _ROW1_Y) + _INST_SIZE + recess_margin * 2,
         )
-        pygame.draw.rect(screen, _BEZEL_COLOR, r1, border_radius=6)
-        pygame.draw.rect(screen, (25, 25, 25), r1, 2, border_radius=6)
+        draw_bezel(r1)
+
+        # "FLIGHT INSTRUMENTS" label above six-pack
+        fi_lbl = self.label_font.render("FLIGHT INSTRUMENTS", True, (120, 122, 125))
+        screen.blit(fi_lbl, (r1.centerx - fi_lbl.get_width() // 2, r1.top - 14))
 
         # Tachometer bezel
         tach_r = pygame.Rect(
             _TACH_X - recess_margin, _TACH_Y - recess_margin,
             _INST_SIZE + recess_margin * 2, _INST_SIZE + recess_margin * 2,
         )
-        pygame.draw.rect(screen, _BEZEL_COLOR, tach_r, border_radius=6)
-        pygame.draw.rect(screen, (25, 25, 25), tach_r, 2, border_radius=6)
+        draw_bezel(tach_r)
 
         # Engine panel recess
         eng_r = pygame.Rect(
             _ENGINE_X - recess_margin, _ENGINE_Y - recess_margin,
             _ENGINE_W + recess_margin * 2, _ENGINE_H + recess_margin * 2,
         )
-        pygame.draw.rect(screen, _BEZEL_COLOR, eng_r, border_radius=6)
-        pygame.draw.rect(screen, (25, 25, 25), eng_r, 2, border_radius=6)
+        draw_bezel(eng_r)
+
+        # Vertical separator between six-pack cluster and right-side panels
+        sep_x = r1.right + (_TACH_X - recess_margin - r1.right) // 2
+        pygame.draw.line(
+            screen, _SECTION_LINE,
+            (sep_x, _PANEL_TOP + 4), (sep_x, self.height - 22), 1,
+        )
 
         # Nav display recess
         nav_r = pygame.Rect(
             _NAV_X - recess_margin, _NAV_Y - recess_margin,
             _NAV_W + recess_margin * 2, _NAV_H + recess_margin * 2 + 18,
         )
-        pygame.draw.rect(screen, _BEZEL_COLOR, nav_r, border_radius=6)
-        pygame.draw.rect(screen, (25, 25, 25), nav_r, 2, border_radius=6)
+        draw_bezel(nav_r)
 
         # CDI bezel
         cdi_r = pygame.Rect(
             _CDI_X - recess_margin, _CDI_Y - recess_margin,
             _NAV_W + recess_margin * 2, _CDI_H + recess_margin * 2 + 18,
         )
-        pygame.draw.rect(screen, _BEZEL_COLOR, cdi_r, border_radius=6)
-        pygame.draw.rect(screen, (25, 25, 25), cdi_r, 2, border_radius=6)
+        draw_bezel(cdi_r)
 
     def _draw_radio_stack(self, screen: pygame.Surface) -> None:
-        pygame.draw.rect(screen, (20, 20, 20),
-                         pygame.Rect(_RADIO_X, _RADIO_Y, _RADIO_W, _RADIO_H),
-                         border_radius=4)
-        pygame.draw.rect(screen, (55, 55, 55),
-                         pygame.Rect(_RADIO_X, _RADIO_Y, _RADIO_W, _RADIO_H),
-                         1, border_radius=4)
+        """Render a King-style avionics radio stack with green LCD displays."""
+        rx, ry, rw, rh = _RADIO_X, _RADIO_Y, _RADIO_W, _RADIO_H
+
+        # Outer housing
+        pygame.draw.rect(screen, (22, 22, 22),
+                         pygame.Rect(rx, ry, rw, rh), border_radius=5)
+        # Housing highlight/shadow edges
+        pygame.draw.line(screen, (50, 50, 50), (rx, ry), (rx + rw, ry), 1)
+        pygame.draw.line(screen, (50, 50, 50), (rx, ry), (rx, ry + rh), 1)
+        pygame.draw.line(screen, (10, 10, 10), (rx, ry + rh), (rx + rw, ry + rh), 1)
+        pygame.draw.line(screen, (10, 10, 10), (rx + rw, ry), (rx + rw, ry + rh), 1)
+        pygame.draw.rect(screen, (45, 45, 45),
+                         pygame.Rect(rx, ry, rw, rh), 1, border_radius=5)
+
         if self._avionics_powered:
-            labels = [
-                ("COM1", f"{self._com1_mhz:.3f}", (0, 185, 255)),
-                ("NAV1", f"{self._nav1_mhz:.2f}",  (100, 230, 100)),
-                ("XPDR", f"{self._squawk:04d}",    (230, 200, 100)),
-                ("ADF",  "400.0",                  (220, 180, 220)),
+            entries = [
+                ("COM 1", f"{self._com1_mhz:.3f}", "MHz", (0, 200, 80)),
+                ("NAV 1", f"{self._nav1_mhz:.2f}",  "MHz", (0, 200, 80)),
+                ("XPDR",  f"{self._squawk:04d}",    "CODE", (0, 200, 80)),
+                ("ADF",   "400.0",                  "kHz",  (0, 200, 80)),
             ]
         else:
-            labels = [
-                ("COM1", "OFF", (120, 120, 120)),
-                ("NAV1", "OFF", (120, 120, 120)),
-                ("XPDR", "OFF", (120, 120, 120)),
-                ("ADF",  "OFF", (120, 120, 120)),
+            entries = [
+                ("COM 1", "- - - . - - -", "MHz", (55, 55, 55)),
+                ("NAV 1", "- - - . - -",   "MHz", (55, 55, 55)),
+                ("XPDR",  "- - - -",       "CODE", (55, 55, 55)),
+                ("ADF",   "- - - . -",     "kHz",  (55, 55, 55)),
             ]
-        item_h = _RADIO_H // len(labels)
-        for i, (name, freq, color) in enumerate(labels):
-            y = _RADIO_Y + i * item_h
-            pygame.draw.rect(screen, (28, 28, 28),
-                             pygame.Rect(_RADIO_X + 4, y + 4, _RADIO_W - 8, item_h - 8),
-                             border_radius=3)
-            name_s = self.radio_font.render(name, True, (180, 180, 180))
-            freq_s = self.radio_font.render(freq, True, color)
-            screen.blit(name_s, (_RADIO_X + 8, y + 6))
-            screen.blit(freq_s, (_RADIO_X + 8, y + item_h // 2))
-            pygame.draw.line(screen, (50, 50, 50),
-                             (_RADIO_X + 4, y + item_h - 4),
-                             (_RADIO_X + _RADIO_W - 4, y + item_h - 4), 1)
 
-        label = self.label_font.render("RADIO STACK", True, _LABEL_COLOR)
-        screen.blit(label, (_RADIO_X + _RADIO_W // 2 - label.get_width() // 2,
-                             _RADIO_Y + _RADIO_H + 2))
+        item_h = rh // len(entries)
+        for i, (name, freq, unit, lcd_color) in enumerate(entries):
+            iy = ry + i * item_h
+            # Unit face background
+            unit_rect = pygame.Rect(rx + 4, iy + 4, rw - 8, item_h - 8)
+            pygame.draw.rect(screen, (16, 16, 16), unit_rect, border_radius=4)
+            pygame.draw.rect(screen, (40, 40, 40), unit_rect, 1, border_radius=4)
+
+            # Instrument name badge (left side)
+            badge_rect = pygame.Rect(rx + 6, iy + 6, 40, item_h - 12)
+            pygame.draw.rect(screen, (30, 30, 30), badge_rect, border_radius=3)
+            name_surf = self.label_font.render(name, True, (160, 162, 165))
+            screen.blit(name_surf, name_surf.get_rect(
+                center=(badge_rect.centerx, badge_rect.centery)))
+
+            # LCD display area (right of badge)
+            lcd_rect = pygame.Rect(rx + 50, iy + 7, rw - 56, item_h - 14)
+            pygame.draw.rect(screen, (8, 20, 8), lcd_rect, border_radius=2)
+            pygame.draw.rect(screen, (0, 60, 20), lcd_rect, 1, border_radius=2)
+
+            # Frequency / code in LCD font
+            freq_surf = self.radio_font.render(freq, True, lcd_color)
+            screen.blit(freq_surf, freq_surf.get_rect(
+                center=(lcd_rect.centerx, lcd_rect.centery - 3)))
+
+            # Unit label below freq
+            unit_surf = self.label_font.render(unit, True,
+                                               (0, 120, 50) if self._avionics_powered else (40, 40, 40))
+            screen.blit(unit_surf, unit_surf.get_rect(
+                center=(lcd_rect.centerx, lcd_rect.bottom - 5)))
+
+            # Separator line between units
+            if i < len(entries) - 1:
+                pygame.draw.line(screen, (35, 35, 35),
+                                 (rx + 4, iy + item_h),
+                                 (rx + rw - 4, iy + item_h), 1)
+
+        label = self.label_font.render("AVIONICS STACK", True, (110, 112, 115))
+        screen.blit(label, (rx + rw // 2 - label.get_width() // 2, ry + rh + 3))
 
     def _draw_yoke(self, screen: pygame.Surface) -> None:
-        """Simple yoke shape at the bottom centre of the cockpit panel."""
-        cx, cy = self.width // 2, self.height - 26
-        yoke_color = (35, 35, 35)
-        # Column (vertical rod)
-        pygame.draw.rect(screen, yoke_color, pygame.Rect(cx - 7, cy - 30, 14, 32), border_radius=4)
-        # Horizontal bar
-        pygame.draw.rect(screen, yoke_color, pygame.Rect(cx - 48, cy - 30, 96, 12), border_radius=6)
-        # Left grip
-        pygame.draw.ellipse(screen, yoke_color, pygame.Rect(cx - 62, cy - 50, 22, 38))
+        """Cessna-style control yoke at the bottom centre of the cockpit panel."""
+        cx, cy = self.width // 2, self.height - 24
+        shaft_color = (28, 28, 28)
+        grip_color = (24, 24, 24)
+        highlight = (55, 55, 55)
+
+        # Column shaft (slightly tapered)
+        pygame.draw.rect(screen, shaft_color,
+                         pygame.Rect(cx - 8, cy - 34, 16, 36), border_radius=4)
+        pygame.draw.line(screen, highlight, (cx - 8, cy - 34), (cx - 8, cy), 1)
+
+        # Horizontal cross-bar
+        pygame.draw.rect(screen, shaft_color,
+                         pygame.Rect(cx - 52, cy - 34, 104, 14), border_radius=7)
+        pygame.draw.line(screen, highlight, (cx - 52, cy - 34), (cx + 52, cy - 34), 1)
+
+        # Left grip (rounded D-shape)
+        pygame.draw.ellipse(screen, grip_color,
+                            pygame.Rect(cx - 66, cy - 56, 24, 42))
+        pygame.draw.ellipse(screen, highlight,
+                            pygame.Rect(cx - 66, cy - 56, 24, 42), 1)
+
         # Right grip
-        pygame.draw.ellipse(screen, yoke_color, pygame.Rect(cx + 40, cy - 50, 22, 38))
-        # Horn button (red)
-        pygame.draw.circle(screen, (170, 30, 30), (cx - 51, cy - 32), 5)
+        pygame.draw.ellipse(screen, grip_color,
+                            pygame.Rect(cx + 42, cy - 56, 24, 42))
+        pygame.draw.ellipse(screen, highlight,
+                            pygame.Rect(cx + 42, cy - 56, 24, 42), 1)
+
+        # PTT / horn button (red, left horn)
+        pygame.draw.circle(screen, (160, 25, 25), (cx - 54, cy - 36), 5)
+        pygame.draw.circle(screen, (200, 60, 60), (cx - 54, cy - 36), 5, 1)
 
     def _draw_info_strip(self, screen: pygame.Surface) -> None:
-        strip_y = self.height - 18
-        pygame.draw.rect(screen, (16, 16, 16),
-                         pygame.Rect(0, strip_y, self.width, 18))
+        """Bottom status strip: ATC messages, checklist status, and system state."""
+        strip_h = 20
+        strip_y = self.height - strip_h
+        # Background
+        pygame.draw.rect(screen, (12, 12, 14),
+                         pygame.Rect(0, strip_y, self.width, strip_h))
+        pygame.draw.line(screen, (45, 47, 50),
+                         (0, strip_y), (self.width, strip_y), 1)
+
+        # ATC messages (left side)
         for idx, msg in enumerate(self.atc_messages):
-            t = self.info_font.render(msg, True, (160, 200, 255))
-            screen.blit(t, (8 + idx * (self.width // 3), strip_y + 2))
-        ck = self.info_font.render(self.checklist_status, True, (245, 210, 110))
-        screen.blit(ck, (self.width - ck.get_width() - 8, strip_y + 2))
-        system_text = (
-            f"MSTR {'ON' if self._master_on else 'OFF'}  "
-            f"AVN {'ON' if self._avionics_on else 'OFF'}  "
-            f"MAG {self._magneto_position}  "
-            f"MIX {self._mixture_pct:3.0f}%  "
-            f"CARB {'HOT' if self._carb_heat_on else 'COLD'}"
+            t = self.info_font.render(msg, True, (145, 195, 255))
+            screen.blit(t, (8 + idx * (self.width // 3), strip_y + 3))
+
+        # Checklist status (right side)
+        ck = self.info_font.render(self.checklist_status, True, (240, 205, 95))
+        screen.blit(ck, (self.width - ck.get_width() - 8, strip_y + 3))
+
+        # System status row above the strip
+        sys_y = strip_y - 17
+        # Separate coloured badges for key system states
+        def _sys_badge(label: str, on: bool, good_color: tuple, bad_color: tuple,
+                       x: int) -> int:
+            color = good_color if on else bad_color
+            surf = self.label_font.render(label, True, color)
+            screen.blit(surf, (x, sys_y))
+            return x + surf.get_width() + 8
+
+        x = 8
+        # Master
+        x = _sys_badge(
+            f"MSTR:{'ON' if self._master_on else 'OFF'}",
+            self._master_on, (140, 220, 140), (220, 140, 140), x,
         )
-        sys_surface = self.info_font.render(system_text, True, (180, 180, 180))
-        screen.blit(sys_surface, (8, strip_y - 16))
+        # Avionics
+        x = _sys_badge(
+            f"AVN:{'ON' if self._avionics_on else 'OFF'}",
+            self._avionics_on, (140, 190, 220), (180, 180, 180), x,
+        )
+        # Magneto
+        mag_ok = self._magneto_position in ("BOTH", "LEFT", "RIGHT")
+        x = _sys_badge(
+            f"MAG:{self._magneto_position}",
+            mag_ok, (210, 210, 140), (180, 180, 180), x,
+        )
+        # Mixture
+        mix_ok = self._mixture_pct >= 60
+        x = _sys_badge(
+            f"MIX:{self._mixture_pct:3.0f}%",
+            mix_ok, (210, 180, 120), (220, 140, 140), x,
+        )
+        # Carb heat
+        _sys_badge(
+            f"CARB:{'HOT' if self._carb_heat_on else 'COLD'}",
+            not self._carb_heat_on, (190, 190, 190), (230, 160, 60), x,
+        )
 
     def _draw_flap_indicator(self, screen: pygame.Surface) -> None:
         """Small flap position indicator strip above the info strip."""
