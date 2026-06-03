@@ -119,6 +119,8 @@ class CockpitView:
         self._com1_mhz = 122.800
         self._nav1_mhz = 110.30
         self._squawk = 1200
+        self._nearest_airport = "---"
+        self._terrain_ft = 0.0
 
     # ── Public API ─────────────────────────────────────────────────────────
 
@@ -160,6 +162,8 @@ class CockpitView:
         self._com1_mhz = float(state.get("com1_mhz", self._com1_mhz))
         self._nav1_mhz = float(state.get("nav1_mhz", self._nav1_mhz))
         self._squawk = int(state.get("squawk", self._squawk))
+        self._nearest_airport = str(state.get("nearest_airport", "---"))
+        self._terrain_ft = float(state.get("terrain_ft", 0.0))
         self.atc_messages = [
             m.text if hasattr(m, "text") else str(m)
             for m in state.get("atc_messages", [])
@@ -214,6 +218,11 @@ class CockpitView:
 
         # Stall warning overlay
         self.stall_warning.draw(screen, self._stall)
+
+        # Interactive instrument hover highlights
+        mx, my = pygame.mouse.get_pos()
+        self._draw_hover_highlight(screen, mx, my)
+        self._update_cursor(mx, my)
 
         # Debrief overlay
         if self._debrief_text:
@@ -652,27 +661,22 @@ class CockpitView:
         pygame.draw.circle(screen, (200, 60, 60), (cx - 54, cy - 36), 5, 1)
 
     def _draw_info_strip(self, screen: pygame.Surface) -> None:
-        """Bottom status strip: ATC messages, checklist status, and system state."""
-        strip_h = 20
+        """Bottom status strip with two rows: system state (row 1) and ATC/checklist (row 2)."""
+        strip_h = 38
         strip_y = self.height - strip_h
+
         # Background
         pygame.draw.rect(screen, (12, 12, 14),
                          pygame.Rect(0, strip_y, self.width, strip_h))
         pygame.draw.line(screen, (45, 47, 50),
                          (0, strip_y), (self.width, strip_y), 1)
+        # Separator between row 1 and row 2
+        pygame.draw.line(screen, (30, 32, 35),
+                         (8, strip_y + 19), (self.width - 8, strip_y + 19), 1)
 
-        # ATC messages (left side)
-        for idx, msg in enumerate(self.atc_messages):
-            t = self.info_font.render(msg, True, (145, 195, 255))
-            screen.blit(t, (8 + idx * (self.width // 3), strip_y + 3))
+        # ── Row 1: system state badges ────────────────────────────────────
+        sys_y = strip_y + 3
 
-        # Checklist status (right side)
-        ck = self.info_font.render(self.checklist_status, True, (240, 205, 95))
-        screen.blit(ck, (self.width - ck.get_width() - 8, strip_y + 3))
-
-        # System status row above the strip
-        sys_y = strip_y - 17
-        # Separate coloured badges for key system states
         def _sys_badge(label: str, on: bool, good_color: tuple, bad_color: tuple,
                        x: int) -> int:
             color = good_color if on else bad_color
@@ -681,39 +685,49 @@ class CockpitView:
             return x + surf.get_width() + 8
 
         x = 8
-        # Master
         x = _sys_badge(
             f"MSTR:{'ON' if self._master_on else 'OFF'}",
             self._master_on, (140, 220, 140), (220, 140, 140), x,
         )
-        # Avionics
         x = _sys_badge(
             f"AVN:{'ON' if self._avionics_on else 'OFF'}",
             self._avionics_on, (140, 190, 220), (180, 180, 180), x,
         )
-        # Magneto
         mag_ok = self._magneto_position in ("BOTH", "LEFT", "RIGHT")
         x = _sys_badge(
             f"MAG:{self._magneto_position}",
             mag_ok, (210, 210, 140), (180, 180, 180), x,
         )
-        # Mixture
         mix_ok = self._mixture_pct >= 60
         x = _sys_badge(
             f"MIX:{self._mixture_pct:3.0f}%",
             mix_ok, (210, 180, 120), (220, 140, 140), x,
         )
-        # Carb heat
         _sys_badge(
             f"CARB:{'HOT' if self._carb_heat_on else 'COLD'}",
             not self._carb_heat_on, (190, 190, 190), (230, 160, 60), x,
         )
 
+        # Nearest airport + terrain elevation (right side of row 1)
+        near_str = f"NEAR:{self._nearest_airport}  GND:{self._terrain_ft:.0f}ft"
+        near = self.label_font.render(near_str, True, (150, 155, 165))
+        screen.blit(near, (self.width - near.get_width() - 8, sys_y))
+
+        # ── Row 2: ATC messages + checklist ──────────────────────────────
+        atc_y = strip_y + 21
+
+        for idx, msg in enumerate(self.atc_messages):
+            t = self.info_font.render(msg, True, (145, 195, 255))
+            screen.blit(t, (8 + idx * (self.width // 3), atc_y))
+
+        ck = self.info_font.render(self.checklist_status, True, (240, 205, 95))
+        screen.blit(ck, (self.width - ck.get_width() - 8, atc_y))
+
     def _draw_flap_indicator(self, screen: pygame.Surface) -> None:
-        """Small flap position indicator strip above the info strip."""
+        """Small flap position indicator strip above the info strip, left side."""
         if self._flaps_deg <= 0.0:
             return
-        x, y = 550, self.height - 36
+        x, y = 10, self.height - 54   # above the 38 px footer, far left
         w, h = 120, 14
         pygame.draw.rect(screen, (40, 40, 40), (x, y, w, h))
         fill_w = int(w * self._flaps_deg / 30.0)
@@ -744,3 +758,127 @@ class CockpitView:
         hint = self.label_font.render("Press D to close debrief", True, (120, 140, 180))
         overlay.blit(hint, (panel_w - hint.get_width() - pad, panel_h - hint.get_height() - 6))
         screen.blit(overlay, (px, py))
+
+    # ── Interactive instrument mouse support ───────────────────────────────
+
+    # Bounding boxes of interactive instruments (x, y, w, h, scroll_label)
+    _INTERACTIVE: list[tuple[int, int, int, int, str]] = [
+        (_COL_DI,  _ROW2_Y,  _INST_SIZE, _INST_SIZE, "HDG BUG ±1°  (Shift ±10°)"),
+        (_COL_ALT, _ROW1_Y,  _INST_SIZE, _INST_SIZE, "BARO ±0.01 inHg"),
+        (_TACH_X,  _TACH_Y,  _INST_SIZE, _INST_SIZE, "THROTTLE ±5%"),
+        (_RADIO_X, _RADIO_Y, _RADIO_W,   _RADIO_H,   "RADIO (COM1 / NAV1 / XPDR)"),
+    ]
+
+    def handle_event(self, event: pygame.event.Event) -> dict:
+        """Process a mouse event for instrument interaction.
+
+        Handles both legacy MOUSEBUTTONDOWN (buttons 4/5) and the modern
+        MOUSEWHEEL event (pygame ≥ 2.0).  Returns a dict with any of:
+          - heading_bug_delta : float  (degrees, ± with Shift for ±10)
+          - baro_delta        : float  (inHg)
+          - throttle_delta    : float  (percent)
+          - com1_delta        : float  (MHz)
+          - nav1_delta        : float  (MHz)
+          - squawk_next / squawk_prev : bool
+        """
+        changes: dict = {}
+
+        # Determine scroll direction and cursor position
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
+            direction = 1 if event.button == 4 else -1
+            mx, my = event.pos
+        elif event.type == getattr(pygame, "MOUSEWHEEL", -1):
+            direction = 1 if event.y > 0 else -1   # type: ignore[attr-defined]
+            mx, my = pygame.mouse.get_pos()
+        else:
+            return changes
+
+        shift = bool(pygame.key.get_mods() & pygame.KMOD_SHIFT)
+
+        # ── Heading indicator (heading bug) ──────────────────────────────
+        if (_COL_DI <= mx < _COL_DI + _INST_SIZE
+                and _ROW2_Y <= my < _ROW2_Y + _INST_SIZE):
+            step = 10.0 if shift else 1.0
+            changes["heading_bug_delta"] = direction * step
+
+        # ── Altimeter (barometric setting) ───────────────────────────────
+        elif (_COL_ALT <= mx < _COL_ALT + _INST_SIZE
+                and _ROW1_Y <= my < _ROW1_Y + _INST_SIZE):
+            changes["baro_delta"] = direction * 0.01
+
+        # ── Tachometer (throttle) ─────────────────────────────────────────
+        elif (_TACH_X <= mx < _TACH_X + _INST_SIZE
+                and _TACH_Y <= my < _TACH_Y + _INST_SIZE):
+            changes["throttle_delta"] = direction * 5.0
+
+        # ── Radio stack ──────────────────────────────────────────────────
+        elif (_RADIO_X <= mx < _RADIO_X + _RADIO_W
+                and _RADIO_Y <= my < _RADIO_Y + _RADIO_H
+                and self._avionics_powered):
+            item_h = _RADIO_H // 4
+            row_idx = (my - _RADIO_Y) // item_h
+            if row_idx == 0:                    # COM 1
+                changes["com1_delta"] = direction * 0.025
+            elif row_idx == 1:                  # NAV 1
+                changes["nav1_delta"] = direction * 0.05
+            elif row_idx == 2:                  # XPDR
+                if direction > 0:
+                    changes["squawk_next"] = True
+                else:
+                    changes["squawk_prev"] = True
+
+        return changes
+
+    def _update_cursor(self, mx: int, my: int) -> None:
+        """Change the system cursor to a hand when hovering over interactive instruments."""
+        hovering = any(
+            x <= mx < x + w and y <= my < y + h
+            for x, y, w, h, _ in self._INTERACTIVE
+        )
+        try:
+            cursor = pygame.SYSTEM_CURSOR_HAND if hovering else pygame.SYSTEM_CURSOR_ARROW
+            pygame.mouse.set_cursor(cursor)
+        except (AttributeError, pygame.error):
+            pass  # older pygame versions don't support named system cursors
+
+    def _draw_hover_highlight(self, screen: pygame.Surface, mx: int, my: int) -> None:
+        """Draw a cyan outline and tooltip over the interactive instrument under the cursor."""
+        item_h = _RADIO_H // 4
+        radio_rows = [
+            (_RADIO_X, _RADIO_Y + i * item_h, _RADIO_W, item_h, lbl)
+            for i, lbl in enumerate(
+                ["COM1 ±0.025 MHz", "NAV1 ±0.050 MHz", "XPDR code", None]
+            )
+            if lbl is not None
+        ]
+
+        regions: list[tuple[int, int, int, int, str]] = [
+            (_COL_DI,  _ROW2_Y,  _INST_SIZE, _INST_SIZE, "↕ HDG BUG ±1°  (Shift ±10°)"),
+            (_COL_ALT, _ROW1_Y,  _INST_SIZE, _INST_SIZE, "↕ BARO ±0.01 inHg"),
+            (_TACH_X,  _TACH_Y,  _INST_SIZE, _INST_SIZE, "↕ THROTTLE ±5%"),
+            *[
+                (rx, ry, rw, rh, f"↕ {rl}")
+                for rx, ry, rw, rh, rl in radio_rows
+            ],
+        ]
+
+        for x, y, w, h, tip_text in regions:
+            if x <= mx < x + w and y <= my < y + h:
+                # Cyan glow outline around the instrument
+                pygame.draw.rect(
+                    screen, (0, 190, 210),
+                    pygame.Rect(x - 2, y - 2, w + 4, h + 4),
+                    2, border_radius=8,
+                )
+                # Tooltip box near cursor
+                tip = self.label_font.render(tip_text, True, (0, 230, 255))
+                tx = max(4, min(mx - tip.get_width() // 2,
+                                self.width - tip.get_width() - 6))
+                ty = max(_PANEL_TOP + 2, my - tip.get_height() - 6)
+                bg = pygame.Surface(
+                    (tip.get_width() + 8, tip.get_height() + 4), pygame.SRCALPHA
+                )
+                bg.fill((8, 18, 28, 210))
+                screen.blit(bg, (tx - 4, ty - 2))
+                screen.blit(tip, (tx, ty))
+                break
