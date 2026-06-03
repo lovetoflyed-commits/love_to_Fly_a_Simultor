@@ -162,9 +162,9 @@ class CockpitView:
         cx, cy_base = W // 2, _WINDSHIELD_H // 2
         # Positive pitch → nose up → horizon moves down
         horizon_cy = cy_base + self._pitch_deg * 7.5
-        roll_rad = math.radians(self._roll_deg)
-        hl_x, hl_y = 0, horizon_cy - cx * math.tan(roll_rad)
-        hr_x, hr_y = W, horizon_cy + (W - cx) * math.tan(roll_rad)
+        (hl_x, hl_y), (hr_x, hr_y) = self._horizon_line_endpoints(
+            W, horizon_cy, self._roll_deg
+        )
 
         # Ground polygon (brown, fills below horizon line)
         ground_color = (110, 80, 45)
@@ -208,6 +208,17 @@ class CockpitView:
         pygame.draw.rect(screen, _PILLAR_COLOR, pygame.Rect(0, 0, W, 14))
         # Bottom windshield frame
         pygame.draw.rect(screen, _PILLAR_COLOR, pygame.Rect(0, H - 6, W, 6))
+
+    def _horizon_line_endpoints(
+        self, width: int, horizon_center_y: float, roll_deg: float
+    ) -> tuple[tuple[float, float], tuple[float, float]]:
+        center_x = width / 2
+        roll_rad = math.radians(roll_deg)
+        slope = math.tan(roll_rad)
+        return (
+            (0.0, horizon_center_y + center_x * slope),
+            (float(width), horizon_center_y - (width - center_x) * slope),
+        )
 
     def _draw_glareshield(self, screen: pygame.Surface) -> None:
         pygame.draw.rect(
@@ -313,4 +324,3 @@ class CockpitView:
             screen.blit(t, (8 + idx * (self.width // 3), strip_y + 2))
         ck = self.info_font.render(self.checklist_status, True, (245, 210, 110))
         screen.blit(ck, (self.width - ck.get_width() - 8, strip_y + 2))
-

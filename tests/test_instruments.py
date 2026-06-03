@@ -15,6 +15,7 @@ from src.instruments.turn_coordinator import TurnCoordinator
 from src.instruments.vsi import VSI
 from src.models.flight_plan import Waypoint
 from src.models.position import Position
+from src.ui.cockpit_view import CockpitView
 
 
 pygame.init()
@@ -57,3 +58,23 @@ def test_instruments_update_and_draw() -> None:
         surface = instrument.draw()
         assert isinstance(surface, pygame.Surface)
 
+
+def test_turn_coordinator_uses_right_turn_sign_convention() -> None:
+    turn_coordinator = TurnCoordinator()
+    captured: dict[str, float] = {}
+
+    def capture_rotation(surf: pygame.Surface, angle: float) -> pygame.Surface:
+        captured["angle"] = angle
+        return surf
+
+    turn_coordinator._rotate_surface = capture_rotation  # type: ignore[method-assign]
+    turn_coordinator.update({"roll_deg": 10.0})
+    turn_coordinator.draw()
+
+    assert captured["angle"] < 0.0
+
+
+def test_cockpit_horizon_roll_sign_matches_right_bank() -> None:
+    cockpit = CockpitView(1280, 720)
+    left, right = cockpit._horizon_line_endpoints(1280, 130.0, 10.0)
+    assert right[1] < left[1]
