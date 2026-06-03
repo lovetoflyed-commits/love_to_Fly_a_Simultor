@@ -7,7 +7,7 @@ from pathlib import Path
 
 @dataclass()
 class Settings:
-    aircraft_config: str = "C172"
+    aircraft_config: str = "C152"
     graphics_quality: str = "medium"
     key_bindings: dict[str, str] = field(default_factory=lambda: {
         "elevator_up": "K_UP",
