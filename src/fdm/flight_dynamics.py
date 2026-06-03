@@ -44,6 +44,7 @@ class FlightDynamics:
         elevator = float(controls.get("elevator_deflection", controls.get("elevator", 0.0)))
         aileron = float(controls.get("aileron_deflection", controls.get("aileron", 0.0)))
         rudder = float(controls.get("rudder_deflection", controls.get("rudder", 0.0)))
+        flaps_deg = float(controls.get("flaps_deg", 0.0))
 
         conditions = atmosphere.get_conditions(self.position.altitude_ft)
         rho = conditions["density_kg_m3"]
@@ -51,8 +52,8 @@ class FlightDynamics:
         flight_path_deg = math.degrees(math.atan2(self.climb_rate_ms, max(1.0, self.velocity_body_ms[0])))
         self.alpha_deg = max(-20.0, min(20.0, self.attitude.pitch_deg - flight_path_deg + elevator * 8.0))
 
-        cl = aerodynamics.compute_cl(self.alpha_deg)
-        cd = aerodynamics.compute_cd(cl)
+        cl = aerodynamics.compute_cl(self.alpha_deg, flaps_deg)
+        cd = aerodynamics.compute_cd(cl) + aircraft.flap_cd_per_deg * flaps_deg
         lift = aerodynamics.compute_lift(rho, tas, cl, aircraft.wing_area_m2)
         drag = aerodynamics.compute_drag(rho, tas, cd, aircraft.wing_area_m2)
         thrust = engine.compute_thrust(throttle, self.position.altitude_ft, atmosphere)
@@ -122,4 +123,6 @@ class FlightDynamics:
             "altitude_ft": self.position.altitude_ft,
             "fuel_kg": aircraft.fuel_kg,
             "g_load": self.g_load,
+            "flaps_deg": flaps_deg,
+            "stall_warning": aerodynamics.is_stalled(self.alpha_deg),
         }

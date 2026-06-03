@@ -8,7 +8,8 @@
     "cl_max": 1.52,
     "cd_zero": 0.031,
     "aspect_ratio": 6.88,
-    "oswald_efficiency": 0.75
+    "oswald_efficiency": 0.75,
+    "flap_cd_per_deg": 0.0010
   },
   "C172": {
     "name": "Cessna 172",
@@ -19,7 +20,20 @@
     "cl_max": 1.5,
     "cd_zero": 0.025,
     "aspect_ratio": 7.32,
-    "oswald_efficiency": 0.75
+    "oswald_efficiency": 0.75,
+    "flap_cd_per_deg": 0.0009
+  },
+  "PA28": {
+    "name": "Piper PA-28 Archer",
+    "max_thrust_N": 5900,
+    "mass_kg": 1050,
+    "wing_area_m2": 15.79,
+    "max_fuel_kg": 136,
+    "cl_max": 1.60,
+    "cd_zero": 0.028,
+    "aspect_ratio": 7.30,
+    "oswald_efficiency": 0.76,
+    "flap_cd_per_deg": 0.0011
   },
   "B737": {
     "name": "Boeing 737-800",
@@ -30,6 +44,7 @@
     "cl_max": 2.8,
     "cd_zero": 0.018,
     "aspect_ratio": 9.45,
-    "oswald_efficiency": 0.82
+    "oswald_efficiency": 0.82,
+    "flap_cd_per_deg": 0.0006
   }
 }

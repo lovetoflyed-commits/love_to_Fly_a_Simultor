@@ -5,6 +5,10 @@ from dataclasses import dataclass
 from ..models.flight_plan import FlightPlan
 
 
+_EMERGENCY_SQUAWKS = {7700: "Emergency", 7600: "Radio Failure", 7500: "Hijack"}
+_IFR_SQUAWK = 1200
+
+
 @dataclass()
 class ATCMessage:
     time_sec: float
@@ -17,6 +21,8 @@ class ATCController:
         self.time_sec = 0.0
         self.messages: list[ATCMessage] = []
         self._last_auto_message = -999.0
+        self._last_squawk: int = _IFR_SQUAWK
+        self._squawk_acknowledged: set[int] = set()
 
     def _push(self, text: str, sender: str = "ATC") -> ATCMessage:
         message = ATCMessage(self.time_sec, sender, text)
@@ -39,6 +45,15 @@ class ATCController:
 
     def update(self, state: dict, dt: float) -> list[ATCMessage]:
         self.time_sec += dt
+
+        # React to emergency transponder codes
+        squawk = int(state.get("squawk", _IFR_SQUAWK))
+        if squawk != self._last_squawk:
+            self._last_squawk = squawk
+            if squawk in _EMERGENCY_SQUAWKS and squawk not in self._squawk_acknowledged:
+                self._squawk_acknowledged.add(squawk)
+                self._push(f"EMERGENCY: Squawk {squawk} received — {_EMERGENCY_SQUAWKS[squawk]}. Say intentions.")
+
         if self.time_sec - self._last_auto_message > 20.0:
             altitude = int(state.get("altitude_ft", 0.0))
             heading = int(state.get("heading_deg", 0.0))

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from .atc import ATCController, ATCMessage
 from .failures import FailureManager, SystemFailure
+from .grader import FlightGrader
 
 
 @dataclass()
@@ -20,15 +21,20 @@ class ScenarioEngine:
         self.events: list[ScenarioEvent] = []
         self.time_sec = 0.0
         self._fired: set[int] = set()
+        self.grader: FlightGrader = FlightGrader()
+        self._scenario_name = "Free Flight"
 
     def load_scenario(self, scenario_dict: dict) -> None:
         self.time_sec = 0.0
         self._fired.clear()
+        self._scenario_name = scenario_dict.get("name", "Free Flight")
         self.events = [ScenarioEvent(event["trigger_time_sec"], event["event_type"], event.get("params", {})) for event in scenario_dict.get("events", [])]
+        self.grader = FlightGrader(self._scenario_name)
 
     def update(self, state: dict, dt: float) -> None:
         self.time_sec += dt
         self.atc.update(state, dt)
+        self.grader.update(state, dt)
         for index, event in enumerate(self.events):
             if index in self._fired or self.time_sec < event.trigger_time_sec:
                 continue
@@ -41,6 +47,14 @@ class ScenarioEngine:
                 self.atc.issue_heading(int(event.params["heading"]))
             elif event.event_type == "altitude":
                 self.atc.issue_altitude(int(event.params["altitude"]))
+                self.grader.set_target_altitude(float(event.params["altitude"]))
+            elif event.event_type == "grade_approach":
+                self.grader.record_approach()
+            elif event.event_type == "grade_hold":
+                self.grader.record_hold()
 
     def get_active_messages(self) -> list[ATCMessage]:
         return list(self.atc.messages)
+
+    def get_grade_report(self) -> str:
+        return self.grader.generate_report().summary()

@@ -78,3 +78,18 @@ def test_cockpit_horizon_roll_sign_matches_right_bank() -> None:
     cockpit = CockpitView(1280, 720)
     left, right = cockpit._horizon_line_endpoints(1280, 130.0, 10.0)
     assert right[1] < left[1]
+
+
+def test_cockpit_blanks_nav_display_when_avionics_unpowered() -> None:
+    cockpit = CockpitView(1280, 720)
+    cockpit.update(
+        {
+            "position": Position(37.6, -122.3, 2450),
+            "waypoints": [Waypoint("A", 37.61, -122.25)],
+            "active_leg": 0,
+            "bearing_to_next_deg": 90,
+            "distance_to_next_nm": 4.2,
+            "avionics_powered": False,
+        }
+    )
+    assert cockpit.nav_display.waypoints == []

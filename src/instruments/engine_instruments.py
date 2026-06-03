@@ -14,12 +14,24 @@ class EngineInstruments(Instrument):
         self.oil_pressure_psi = 65.0
         self.fuel_kg = 0.0
         self.max_fuel_kg = 83.0
+        self.suction_inhg = 4.8
+        self.bus_voltage_v = 13.8
+        self.master_on = True
+        self.avionics_on = True
+        self.engine_running = True
+        self.magneto_position = "BOTH"
 
     def update(self, state: dict) -> None:
         self.oil_temp_c = float(state.get("oil_temp_c", 80.0))
         self.oil_pressure_psi = float(state.get("oil_pressure_psi", 65.0))
         self.fuel_kg = float(state.get("fuel_kg", 0.0))
         self.max_fuel_kg = max(1.0, float(state.get("max_fuel_kg", 83.0)))
+        self.suction_inhg = float(state.get("suction_inhg", 4.8))
+        self.bus_voltage_v = float(state.get("bus_voltage_v", 13.8))
+        self.master_on = bool(state.get("master_on", True))
+        self.avionics_on = bool(state.get("avionics_on", True))
+        self.engine_running = bool(state.get("engine_running", True))
+        self.magneto_position = str(state.get("magneto_position", "BOTH")).upper()
 
     # ------------------------------------------------------------------
     # Colour helpers
@@ -50,6 +62,26 @@ class EngineInstruments(Instrument):
         if ratio < 0.15:
             return (215, 40, 40)
         if ratio < 0.25:
+            return (215, 175, 30)
+        return (0, 175, 65)
+
+    @staticmethod
+    def _suction_color(suction_inhg: float) -> tuple[int, int, int]:
+        if suction_inhg < 3.0:
+            return (215, 40, 40)
+        if suction_inhg < 4.5:
+            return (215, 175, 30)
+        if suction_inhg <= 5.5:
+            return (0, 175, 65)
+        return (215, 175, 30)
+
+    @staticmethod
+    def _bus_color(voltage: float, powered: bool) -> tuple[int, int, int]:
+        if not powered:
+            return (120, 120, 120)
+        if voltage < 12.0:
+            return (215, 40, 40)
+        if voltage < 12.6:
             return (215, 175, 30)
         return (0, 175, 65)
 
@@ -135,5 +167,26 @@ class EngineInstruments(Instrument):
         for i, (lbl, reading, ratio, color) in enumerate(gauges):
             bx = margin + i * (bar_w + spacing)
             self._draw_bar_gauge(lbl, reading, bx, bar_top, bar_h, bar_w, ratio, color)
+
+        systems_y = bar_top + bar_h + 31
+        engine_systems_active = self.master_on and self.engine_running
+        vac = self.small_font.render(
+            f"VAC {self.suction_inhg:0.1f}",
+            True,
+            self._suction_color(self.suction_inhg),
+        )
+        bus = self.small_font.render(
+            f"BUS {self.bus_voltage_v:0.1f}V",
+            True,
+            self._bus_color(self.bus_voltage_v, self.master_on),
+        )
+        switches = self.small_font.render(
+            f"M:{'ON' if self.master_on else 'OFF'} AV:{'ON' if self.avionics_on else 'OFF'} MAG:{self.magneto_position}",
+            True,
+            (205, 205, 205) if engine_systems_active else (150, 150, 150),
+        )
+        self.surface.blit(vac, (10, systems_y))
+        self.surface.blit(bus, (self.width - bus.get_width() - 10, systems_y))
+        self.surface.blit(switches, (10, systems_y + 14))
 
         return self.surface
