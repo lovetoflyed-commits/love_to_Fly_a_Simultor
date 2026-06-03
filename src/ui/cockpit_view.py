@@ -372,9 +372,6 @@ class CockpitView:
             return lat + d_lat, lon + d_lon
 
         perp = rwy_hdg_rad + math.pi / 2
-        tl_lat, tl_lon = offset(*offset(t_lat, t_lon, half_width_ft, perp), 0, 0)
-        tr_lat, tr_lon = offset(*offset(t_lat, t_lon, -half_width_ft, perp), 0, 0)
-        # Recompute properly
         tl_lat, tl_lon = offset(t_lat, t_lon, half_width_ft, perp)
         tr_lat, tr_lon = offset(t_lat, t_lon, -half_width_ft, perp)
         far_lat, far_lon = offset(t_lat, t_lon, length_ft, rwy_hdg_rad)
@@ -393,7 +390,7 @@ class CockpitView:
             if p is None:
                 return     # partial clip — skip for simplicity
             sx, sy = p
-            if not (-W, -H) <= (int(sx), int(sy)) <= (W * 2, H * 2):
+            if not (-W <= int(sx) <= W * 2 and -H <= int(sy) <= H * 2):
                 return
             pts.append((int(sx), int(sy)))
 

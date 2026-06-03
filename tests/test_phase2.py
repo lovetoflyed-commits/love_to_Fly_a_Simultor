@@ -100,8 +100,8 @@ def test_autopilot_ils_provides_roll_command():
         cross_track_error_nm = 0.0
 
     class _FakePlan:
-        waypoints: list = []
         active_leg: int = 0
+        def __init__(self): self.waypoints = []
         def active_waypoint(self):
             return None
 
