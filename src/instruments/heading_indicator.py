@@ -5,6 +5,8 @@ import pygame
 
 from .base_instrument import Instrument
 
+HEADING_BUG_WRAP_OFFSET_DEG = 540.0
+
 
 class HeadingIndicator(Instrument):
     """Directional Gyro / Heading Indicator for the Cessna 152.
@@ -73,7 +75,7 @@ class HeadingIndicator(Instrument):
         )
 
         # ── Heading bug marker (cyan) ─────────────────────────────────────
-        bug_relative_deg = ((self.heading_bug_deg - self.heading_deg + 540.0) % 360.0) - 180.0
+        bug_relative_deg = ((self.heading_bug_deg - self.heading_deg + HEADING_BUG_WRAP_OFFSET_DEG) % 360.0) - 180.0
         bug_angle = math.radians(90.0 - bug_relative_deg)
         bug_outer_r = radius + 2
         bug_inner_r = radius - 12

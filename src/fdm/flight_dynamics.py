@@ -74,6 +74,7 @@ class FlightDynamics:
         else:
             wind = None
 
+        # Allow true stationary starts (e.g., runway lineup) instead of forcing taxi speed.
         self.velocity_body_ms[0] = max(0.0, self.velocity_body_ms[0] + longitudinal_accel * dt)
         self.velocity_body_ms[1] += rudder * 0.5 * dt
         self.climb_rate_ms += vertical_accel * dt

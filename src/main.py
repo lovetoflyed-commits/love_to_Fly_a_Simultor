@@ -71,6 +71,9 @@ HEADING_WRAP_OFFSET_DEG = 540.0
 DG_MINIMUM_SUCTION_INHG = 3.5
 FULL_CIRCLE_DEG = 360.0
 HALF_CIRCLE_DEG = 180.0
+HEADING_BUG_STEP_SMALL_DEG = 1.0
+HEADING_BUG_STEP_LARGE_DEG = 10.0
+RUNWAY_SPAWN_OFFSET_FT = -300.0
 
 _SCENARIO_MAP = {
     "RUNWAY_START": {"name": "Runway Start SBGR 10R", "events": []},
@@ -123,6 +126,7 @@ def _nearby_runway_dicts(airport_db: AirportDatabase, fdm: FlightDynamics, max_n
 
 
 def _offset_position(lat: float, lon: float, distance_ft: float, bearing_deg: float) -> tuple[float, float]:
+    """Return a new lat/lon from a start point, distance in feet, and bearing in degrees."""
     distance_m = distance_ft * 0.3048
     bearing_rad = radians(bearing_deg)
     d_lat = distance_m * cos(bearing_rad) / 111_320.0
@@ -144,7 +148,7 @@ def _spawn_lined_up_on_runway(fdm: FlightDynamics, airport_db: AirportDatabase, 
     spawn_lat, spawn_lon = _offset_position(
         runway.threshold_lat,
         runway.threshold_lon,
-        -300.0,
+        RUNWAY_SPAWN_OFFSET_FT,
         runway.heading_deg,
     )
     fdm.position.latitude_deg = spawn_lat
@@ -269,7 +273,7 @@ def main() -> None:
                 elif event.key == pygame.K_o:
                     autopilot.engage(APMode.OFF)
                 elif event.key in (pygame.K_j, pygame.K_k):
-                    step = 10.0 if pygame.key.get_mods() & pygame.KMOD_SHIFT else 1.0
+                    step = HEADING_BUG_STEP_LARGE_DEG if pygame.key.get_mods() & pygame.KMOD_SHIFT else HEADING_BUG_STEP_SMALL_DEG
                     heading_bug_deg = _step_heading_bug(heading_bug_deg, step if event.key == pygame.K_k else -step)
                     autopilot.set_target(heading=heading_bug_deg)
                 # ── Checklist ─────────────────────────────────────────────
