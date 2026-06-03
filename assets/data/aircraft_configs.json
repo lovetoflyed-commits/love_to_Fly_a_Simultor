@@ -1,4 +1,15 @@
 {
+  "C152": {
+    "name": "Cessna 152",
+    "max_thrust_N": 4400,
+    "mass_kg": 757,
+    "wing_area_m2": 14.86,
+    "max_fuel_kg": 83,
+    "cl_max": 1.52,
+    "cd_zero": 0.031,
+    "aspect_ratio": 6.88,
+    "oswald_efficiency": 0.75
+  },
   "C172": {
     "name": "Cessna 172",
     "max_thrust_N": 10000,

@@ -21,3 +21,8 @@ class Engine:
     @property
     def n1_pct(self) -> float:
         return self._last_throttle_pct * 0.98
+
+    @property
+    def rpm(self) -> float:
+        """Piston engine RPM (Lycoming O-235: idle ~800, full power 2750)."""
+        return 800.0 + (self._last_throttle_pct / 100.0) * 1950.0
