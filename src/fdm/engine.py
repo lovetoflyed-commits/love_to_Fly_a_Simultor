@@ -4,6 +4,11 @@ from .atmosphere import ISAAtmosphere
 
 
 class Engine:
+    STARTER_CRANKING_RPM = 220.0
+    IDLE_RPM = 700.0
+    MAX_RPM = 2750.0
+    ALTERNATOR_CUT_IN_RPM = 1000.0
+
     def __init__(self, max_thrust_N: float = 10_000.0) -> None:
         self.max_thrust_N = max_thrust_N
         self._last_throttle_pct = 0.0
@@ -42,6 +47,11 @@ class Engine:
             self.engine_running = False
 
     def _mixture_power_factor(self) -> float:
+        """Approximate O-235 mixture behavior.
+
+        5% or less acts as idle cutoff, 35-85% is the practical operating
+        band, and very rich settings above 85% slightly reduce available power.
+        """
         if self.mixture_pct <= 5.0:
             return 0.0
         if self.mixture_pct < 35.0:
@@ -78,6 +88,7 @@ class Engine:
     def compute_fuel_burn_kgs(self, thrust_N: float, dt: float) -> float:
         if not self.engine_running:
             return 0.0
+        # Simple rich/lean model: burn factor varies from 0.7 (lean) to 1.1 (full rich).
         richness = 0.7 + (self.mixture_pct / 100.0) * 0.4
         return max(0.0, thrust_N) * 0.00008 * richness * max(dt, 0.0)
 
@@ -85,30 +96,41 @@ class Engine:
     def n1_pct(self) -> float:
         if not self.engine_running:
             return 0.0
-        return (self.rpm / 2750.0) * 100.0
+        return (self.rpm / self.MAX_RPM) * 100.0
 
     @property
     def rpm(self) -> float:
         """Piston engine RPM (Lycoming O-235: idle ~800, full power 2750)."""
         if not self.engine_running:
             if self.starter_engaged and self.master_on and self.magneto_position in {"L", "R", "BOTH"}:
-                return 220.0
+                return self.STARTER_CRANKING_RPM
             return 0.0
-        idle = 700.0
-        max_power = 2750.0
-        return idle + (self._last_throttle_pct / 100.0) * (max_power - idle) * self._mixture_power_factor() * self._magneto_power_factor() * (0.9 if self.carb_heat_on else 1.0)
+        return (
+            self.IDLE_RPM
+            + (self._last_throttle_pct / 100.0)
+            * (self.MAX_RPM - self.IDLE_RPM)
+            * self._mixture_power_factor()
+            * self._magneto_power_factor()
+            * (0.9 if self.carb_heat_on else 1.0)
+        )
 
     @property
     def suction_inhg(self) -> float:
         if not self.engine_running:
             return 0.0
-        return min(6.0, max(2.0, 2.0 + (self.rpm - 700.0) / 2050.0 * 3.6))
+        return min(
+            6.0,
+            max(
+                2.0,
+                2.0 + (self.rpm - self.IDLE_RPM) / (self.MAX_RPM - self.IDLE_RPM) * 3.6,
+            ),
+        )
 
     @property
     def bus_voltage_v(self) -> float:
         if not self.master_on:
             return 0.0
-        if self.engine_running and self.rpm >= 1000.0:
+        if self.engine_running and self.rpm >= self.ALTERNATOR_CUT_IN_RPM:
             return 13.8
         return 12.3
 

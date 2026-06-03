@@ -169,7 +169,7 @@ class EngineInstruments(Instrument):
             self._draw_bar_gauge(lbl, reading, bx, bar_top, bar_h, bar_w, ratio, color)
 
         systems_y = bar_top + bar_h + 31
-        powered = self.master_on and self.engine_running
+        engine_systems_active = self.master_on and self.engine_running
         vac = self.small_font.render(
             f"VAC {self.suction_inhg:0.1f}",
             True,
@@ -183,7 +183,7 @@ class EngineInstruments(Instrument):
         switches = self.small_font.render(
             f"M:{'ON' if self.master_on else 'OFF'} AV:{'ON' if self.avionics_on else 'OFF'} MAG:{self.magneto_position}",
             True,
-            (205, 205, 205) if powered else (150, 150, 150),
+            (205, 205, 205) if engine_systems_active else (150, 150, 150),
         )
         self.surface.blit(vac, (10, systems_y))
         self.surface.blit(bus, (self.width - bus.get_width() - 10, systems_y))

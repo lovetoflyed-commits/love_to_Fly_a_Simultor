@@ -27,7 +27,7 @@ class Checklist:
         return self.current_item_index >= len(self.items)
 
 
-BEFORE_TAKEOFF = [
+ENGINE_START_RUNUP = [
     ChecklistItem("Parking brake set"),
     ChecklistItem("Fuel shutoff valve in"),
     ChecklistItem("Master switch ON"),
@@ -39,8 +39,10 @@ BEFORE_TAKEOFF = [
     ChecklistItem("Run-up 1700 RPM, mags checked"),
     ChecklistItem("Flight controls free and correct"),
     ChecklistItem("Instruments set and checked"),
+    ChecklistItem("Trim set for takeoff"),
     ChecklistItem("Departure briefing complete"),
 ]
+BEFORE_TAKEOFF = ENGINE_START_RUNUP
 CRUISE = [ChecklistItem("Power set"), ChecklistItem("Mixture adjusted"), ChecklistItem("Fuel balance checked")]
 APPROACH = [ChecklistItem("ATIS / weather reviewed"), ChecklistItem("Approach briefed"), ChecklistItem("Nav radios identified")]
 BEFORE_LANDING = [ChecklistItem("Fuel selector fullest tank"), ChecklistItem("Mixture rich"), ChecklistItem("Landing light on")]

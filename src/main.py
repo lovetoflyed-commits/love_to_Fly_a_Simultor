@@ -8,7 +8,7 @@ import pygame
 
 if __package__ in {None, ""}:
     sys.path.append(str(Path(__file__).resolve().parent.parent))
-    from src.chairflight.checklist import BEFORE_TAKEOFF, Checklist
+    from src.chairflight.checklist import ENGINE_START_RUNUP, Checklist
     from src.chairflight.logbook import Logbook
     from src.environment.airport import AirportDatabase
     from src.environment.terrain import Terrain
@@ -31,7 +31,7 @@ if __package__ in {None, ""}:
     from src.ui.hud import HUD
     from src.ui.settings import Settings
 else:
-    from .chairflight.checklist import BEFORE_TAKEOFF, Checklist
+    from .chairflight.checklist import ENGINE_START_RUNUP, Checklist
     from .chairflight.logbook import Logbook
     from .environment.airport import AirportDatabase
     from .environment.terrain import Terrain
@@ -53,6 +53,13 @@ else:
     from .ui.cockpit_view import CockpitView
     from .ui.hud import HUD
     from .ui.settings import Settings
+
+DG_FOLLOW_GAIN = 0.7
+DG_DRIFT_DEG_PER_SEC = 0.03
+HEADING_WRAP_OFFSET_DEG = 540.0
+DG_MINIMUM_SUCTION_INHG = 3.5
+FULL_CIRCLE_DEG = 360.0
+HALF_CIRCLE_DEG = 180.0
 
 
 def _load_aircraft(config_name: str) -> Aircraft:
@@ -89,7 +96,7 @@ def main() -> None:
     airport_db = AirportDatabase()
     failure_manager = FailureManager()
     logbook = Logbook()
-    checklist = Checklist("Engine Start / Before Takeoff", BEFORE_TAKEOFF)
+    checklist = Checklist("Engine Start & Run-up", ENGINE_START_RUNUP)
     cockpit = CockpitView(1280, 720)
     hud = HUD()
     gps = GPS()
@@ -104,7 +111,7 @@ def main() -> None:
     atc.generate_clearance(flight_plan)
     procedures.get_approaches("SBGR")
 
-    throttle_pct = 0.0
+    throttle_pct = 0.0  # cold-and-dark startup uses closed throttle.
     master_on = False
     avionics_on = False
     mixture_pct = 100.0
@@ -191,15 +198,23 @@ def main() -> None:
         fdm_state = fdm.update(dt, controls, aircraft, atmosphere, aerodynamics, engine, weather)
         gps.update(fdm.position, flight_plan, dt)
         scenario_engine.update(fdm_state, dt)
-        if engine.suction_inhg >= 3.5:
-            heading_error = ((fdm.attitude.yaw_deg - dg_heading_deg + 540.0) % 360.0) - 180.0
-            dg_heading_deg = (dg_heading_deg + heading_error * min(1.0, dt * 0.7) + dt * 0.03) % 360.0
+        if engine.suction_inhg >= DG_MINIMUM_SUCTION_INHG:
+            heading_error = (
+                (fdm.attitude.yaw_deg - dg_heading_deg + HEADING_WRAP_OFFSET_DEG)
+                % FULL_CIRCLE_DEG
+            ) - HALF_CIRCLE_DEG
+            dg_heading_deg = (
+                dg_heading_deg
+                + heading_error * min(1.0, dt * DG_FOLLOW_GAIN)
+                + dt * DG_DRIFT_DEG_PER_SEC
+            ) % FULL_CIRCLE_DEG
 
         next_waypoint = flight_plan.active_waypoint().name if flight_plan.active_waypoint() else "---"
         nearest = airport_db.nearest_airport(fdm.position, 30.0)
         instrument_heading = failure_manager.modify_instrument_reading("heading_indicator", dg_heading_deg)
-        instrument_pitch = failure_manager.modify_instrument_reading("attitude_indicator", fdm_state["pitch_deg"])
-        instrument_roll = failure_manager.modify_instrument_reading("attitude_indicator", fdm_state["roll_deg"])
+        attitude_scale = failure_manager.modify_instrument_reading("attitude_indicator", 1.0)
+        instrument_pitch = fdm_state["pitch_deg"] * attitude_scale
+        instrument_roll = fdm_state["roll_deg"] * attitude_scale
         instrument_airspeed = failure_manager.modify_instrument_reading("airspeed_indicator", fdm_state["airspeed_kts"])
         instrument_altitude = failure_manager.modify_instrument_reading("altimeter", fdm_state["altitude_ft"])
         instrument_vsi = failure_manager.modify_instrument_reading("vsi", fdm_state["vertical_speed_fpm"])
@@ -222,8 +237,8 @@ def main() -> None:
             "rpm": engine.rpm,
             "fuel_kg": aircraft.fuel_kg,
             "max_fuel_kg": aircraft.max_fuel_kg,
-            "oil_pressure_psi": 55.0 + (engine.rpm / 2750.0) * 28.0 if engine.engine_running else 10.0,
-            "oil_temp_c": 45.0 + engine.rpm / 2750.0 * 80.0 if engine.engine_running else 35.0,
+            "oil_pressure_psi": 55.0 + (engine.rpm / engine.MAX_RPM) * 28.0 if engine.engine_running else 10.0,
+            "oil_temp_c": 45.0 + engine.rpm / engine.MAX_RPM * 80.0 if engine.engine_running else 35.0,
             "egt_c": 500.0 + engine.n1_pct * 2.0,
             "suction_inhg": engine.suction_inhg,
             "bus_voltage_v": engine.bus_voltage_v,

@@ -15,6 +15,7 @@ def test_engine_requires_valid_start_configuration_for_thrust() -> None:
     )
     engine.engine_running = False
     engine.update_system_state(40.0)
+    assert not engine.engine_running
     assert engine.compute_thrust(80.0, 2000.0, atmosphere) == 0.0
 
     engine.set_controls(

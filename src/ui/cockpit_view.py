@@ -359,7 +359,7 @@ class CockpitView:
             f"MSTR {'ON' if self._master_on else 'OFF'}  "
             f"AVN {'ON' if self._avionics_on else 'OFF'}  "
             f"MAG {self._magneto_position}  "
-            f"MIX {self._mixture_pct:03.0f}%  "
+            f"MIX {self._mixture_pct:3.0f}%  "
             f"CARB {'HOT' if self._carb_heat_on else 'COLD'}"
         )
         sys_surface = self.info_font.render(system_text, True, (180, 180, 180))
