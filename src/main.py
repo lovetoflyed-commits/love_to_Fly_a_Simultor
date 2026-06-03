@@ -187,7 +187,6 @@ def main() -> None:
         pygame.display.flip()
 
     pygame.quit()
-    logbook.entries.clear()
 
 
 if __name__ == "__main__":

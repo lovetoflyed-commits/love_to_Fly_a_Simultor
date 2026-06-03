@@ -31,7 +31,7 @@ class Weather:
     @staticmethod
     def get_turbulence_acceleration(intensity: str, dt: float) -> tuple[float, float, float]:
         scale = {"light": 0.3, "moderate": 0.8, "severe": 1.5}.get(intensity, 0.0)
-        return tuple(random.uniform(-scale, scale) * max(dt, 0.1) for _ in range(3))
+        return tuple(random.uniform(-scale, scale) * dt for _ in range(3))
 
     def icing_severity(self, altitude_ft: float, oat_c: float) -> str:
         in_cloud = self.ceiling_ft is not None and altitude_ft <= self.ceiling_ft + 2000

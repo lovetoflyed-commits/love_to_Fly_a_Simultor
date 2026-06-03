@@ -62,10 +62,9 @@ class Autopilot:
         state: dict,
         flight_plan: FlightPlan | None,
         gps: GPS | None,
-        vor_receiver: VORReceiver | None,
+        _vor_receiver: VORReceiver | None,
         dt: float,
     ) -> dict[str, float]:
-        del vor_receiver
         dt = max(dt, 1e-3)
         roll = float(state.get("roll_deg", 0.0))
         heading = float(state.get("heading_deg", 0.0))
