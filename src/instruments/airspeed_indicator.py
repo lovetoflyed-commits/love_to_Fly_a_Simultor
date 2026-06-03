@@ -56,23 +56,25 @@ class AirspeedIndicator(Instrument):
     def draw(self) -> pygame.Surface:
         self.surface.fill((0, 0, 0, 0))
         self._draw_circle_bg(self.surface, self.bg_color)
-        center = pygame.Vector2(self.width / 2, self.height / 2)
+        cx = self.width / 2
+        cy = self.height / 2
+        center = (cx, cy)
         radius = min(self.width, self.height) // 2 - 12
 
         # Coloured speed arcs
-        self._draw_arc((220, 220, 220), 40, 85, radius, 6)       # white – flap range
-        self._draw_arc((0, 175, 65), 44, 111, radius - 7, 6)     # green – normal
-        self._draw_arc((215, 195, 30), 111, 149, radius - 14, 5) # yellow – caution
+        self._draw_arc((200, 200, 200), 40, 85, radius, 7)       # white – flap range
+        self._draw_arc((0, 185, 75), 44, 111, radius - 8, 6)     # green – normal
+        self._draw_arc((215, 185, 20), 111, 149, radius - 15, 5) # yellow – caution
 
         # Red Vne radial at 149 kts
         vne_angle = math.radians(self._value_to_angle(149.0))
         vne_outer = (
-            center.x + math.cos(vne_angle) * radius,
-            center.y - math.sin(vne_angle) * radius,
+            cx + math.cos(vne_angle) * radius,
+            cy - math.sin(vne_angle) * radius,
         )
         vne_inner = (
-            center.x + math.cos(vne_angle) * (radius - 16),
-            center.y - math.sin(vne_angle) * (radius - 16),
+            cx + math.cos(vne_angle) * (radius - 18),
+            cy - math.sin(vne_angle) * (radius - 18),
         )
         pygame.draw.line(self.surface, (215, 40, 40), vne_inner, vne_outer, 4)
 
@@ -80,32 +82,43 @@ class AirspeedIndicator(Instrument):
         for speed in range(0, int(self.MAX_SPEED) + 1, 10):
             angle = math.radians(self._value_to_angle(speed))
             major = speed % 20 == 0
-            inner_r = radius - (15 if major else 7)
-            ox = center.x + math.cos(angle) * radius
-            oy = center.y - math.sin(angle) * radius
-            ix = center.x + math.cos(angle) * inner_r
-            iy = center.y - math.sin(angle) * inner_r
+            inner_r = radius - (16 if major else 8)
+            ox = cx + math.cos(angle) * radius
+            oy = cy - math.sin(angle) * radius
+            ix = cx + math.cos(angle) * inner_r
+            iy = cy - math.sin(angle) * inner_r
             pygame.draw.line(self.surface, (255, 255, 255), (ox, oy), (ix, iy), 2 if major else 1)
             if major and speed > 0:
                 lbl = self.small_font.render(str(speed), True, (225, 225, 225))
-                lx = center.x + math.cos(angle) * (radius - 28) - lbl.get_width() / 2
-                ly = center.y - math.sin(angle) * (radius - 28) - lbl.get_height() / 2
+                lx = cx + math.cos(angle) * (radius - 28) - lbl.get_width() / 2
+                ly = cy - math.sin(angle) * (radius - 28) - lbl.get_height() / 2
                 self.surface.blit(lbl, (lx, ly))
 
-        # Needle
-        angle = math.radians(self._value_to_angle(self.airspeed_kts))
-        tip = (
-            center.x + math.cos(angle) * (radius - 16),
-            center.y - math.sin(angle) * (radius - 16),
+        # KIAS label
+        kias_lbl = self.small_font.render("KIAS", True, (160, 160, 160))
+        self.surface.blit(kias_lbl, kias_lbl.get_rect(center=(int(cx), int(cy) + 30)))
+
+        # Needle (white body, red tip section)
+        angle_deg = self._value_to_angle(self.airspeed_kts)
+        angle_rad = math.radians(angle_deg)
+        self._draw_needle(
+            self.surface, center, angle_rad,
+            length=radius - 14, width=4,
+            color=(255, 255, 255), tail_length=radius * 0.20, tail_color=(80, 80, 80),
         )
-        pygame.draw.line(self.surface, (255, 80, 80), center, tip, 3)
-        pygame.draw.circle(self.surface, (255, 80, 80), center, 5)
+        # Red tip overlay on outer portion
+        tip_len = radius - 14
+        tip_x = cx + math.cos(angle_rad) * tip_len
+        tip_y = cy - math.sin(angle_rad) * tip_len
+        mid_x = cx + math.cos(angle_rad) * (radius * 0.5)
+        mid_y = cy - math.sin(angle_rad) * (radius * 0.5)
+        pygame.draw.line(self.surface, (230, 60, 60), (mid_x, mid_y), (tip_x, tip_y), 2)
 
         # Digital readout
         digital = self.large_font.render(f"{self.airspeed_kts:03.0f}", True, (255, 255, 255))
-        self.surface.blit(digital, digital.get_rect(center=(center.x, center.y + 42)))
-        kts_lbl = self.small_font.render("KIAS", True, (175, 175, 175))
-        self.surface.blit(kts_lbl, kts_lbl.get_rect(center=(center.x, center.y + 58)))
+        self.surface.blit(digital, digital.get_rect(center=(int(cx), int(cy) + 46)))
 
+        self._draw_pivot_cap(self.surface, center, radius=6)
         return self.surface
+
 
