@@ -7,7 +7,7 @@ from pathlib import Path
 from ..models.flight_plan import Waypoint
 
 
-@dataclass(slots=True)
+@dataclass()
 class Procedure:
     name: str
     type: str

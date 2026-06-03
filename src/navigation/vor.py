@@ -6,7 +6,7 @@ import math
 from ..models.position import Position
 
 
-@dataclass(slots=True)
+@dataclass()
 class VOR:
     name: str
     lat: float
@@ -42,7 +42,7 @@ class VORReceiver:
         return self.get_distance_nm(aircraft_position, vor) <= vor.range_nm and self.frequency_mhz == vor.frequency_mhz
 
 
-@dataclass(slots=True)
+@dataclass()
 class ILSLocalizer:
     vor_lat: float
     vor_lon: float

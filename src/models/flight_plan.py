@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from .position import Position
 
 
-@dataclass(slots=True)
+@dataclass()
 class Waypoint:
     name: str
     lat: float
@@ -16,7 +16,7 @@ class Waypoint:
         return Position(self.lat, self.lon, self.altitude_ft or 0.0)
 
 
-@dataclass(slots=True)
+@dataclass()
 class FlightPlan:
     waypoints: list[Waypoint] = field(default_factory=list)
     active_leg: int = 0

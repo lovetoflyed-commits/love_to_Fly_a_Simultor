@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
-@dataclass(slots=True)
+@dataclass()
 class ChecklistItem:
     text: str
     action_required: bool = True

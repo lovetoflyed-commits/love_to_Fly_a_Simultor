@@ -8,7 +8,7 @@ EARTH_RADIUS_M = 6_371_000.0
 M_PER_NM = 1852.0
 
 
-@dataclass(slots=True)
+@dataclass()
 class Position:
     latitude_deg: float
     longitude_deg: float

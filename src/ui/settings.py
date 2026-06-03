@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 
-@dataclass(slots=True)
+@dataclass()
 class Settings:
     aircraft_config: str = "C172"
     graphics_quality: str = "medium"
