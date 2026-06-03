@@ -50,7 +50,7 @@ class TurnCoordinator(Instrument):
         )
 
         # Miniature airplane — bank angle is 1.5× roll (standard-rate at ~18°)
-        tc_bank = max(-35.0, min(35.0, self.roll_deg * 1.5))
+        tc_bank = max(-35.0, min(35.0, -self.roll_deg * 1.5))
         airplane_surf = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
         ac_cx = int(self.width / 2)
         ac_cy = int(self.height / 2) - 4
