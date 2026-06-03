@@ -22,6 +22,7 @@ class MainMenu:
     ]
 
     _SCENARIO_OPTIONS = [
+        ("RUNWAY_START",        "Runway 10R SBGR start (lined up)"),
         ("ILS_APPROACH",        "ILS 10R SBGR approach"),
         ("MISSED_APPROACH",     "Missed approach & go-around"),
         ("HOLDING_PATTERN",     "Holding pattern – partial panel"),
@@ -44,7 +45,7 @@ class MainMenu:
         self._focus = "aircraft"  # "aircraft" | "scenario" | "start"
         self.done = False
         self.selected_aircraft = "C152"
-        self.selected_scenario = "ILS_APPROACH"
+        self.selected_scenario = "RUNWAY_START"
 
     # ── Public ────────────────────────────────────────────────────────────────
 

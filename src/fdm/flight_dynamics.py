@@ -15,6 +15,7 @@ FT_TO_M = 0.3048
 M_TO_FT = 1.0 / FT_TO_M
 MPS_TO_KTS = 1.94384449
 MPS_TO_FPM = 196.850394
+SEA_LEVEL_DENSITY_KG_M3 = 1.225
 
 
 @dataclass
@@ -73,7 +74,7 @@ class FlightDynamics:
         else:
             wind = None
 
-        self.velocity_body_ms[0] = max(12.0, self.velocity_body_ms[0] + longitudinal_accel * dt)
+        self.velocity_body_ms[0] = max(0.0, self.velocity_body_ms[0] + longitudinal_accel * dt)
         self.velocity_body_ms[1] += rudder * 0.5 * dt
         self.climb_rate_ms += vertical_accel * dt
         self.climb_rate_ms *= 0.995
@@ -104,6 +105,7 @@ class FlightDynamics:
         self.position.longitude_deg += (east_ms * dt) / lon_scale
 
         self.airspeed_kts = max(0.0, self.velocity_body_ms[0] * MPS_TO_KTS)
+        indicated_airspeed_kts = self.airspeed_kts * math.sqrt(max(0.0, rho) / SEA_LEVEL_DENSITY_KG_M3)
         self.vertical_speed_fpm = self.climb_rate_ms * MPS_TO_FPM
         self.g_load = (lift / max(weight, 1.0)) if weight else 1.0
 
@@ -116,6 +118,7 @@ class FlightDynamics:
             "drag_N": drag,
             "alpha_deg": self.alpha_deg,
             "airspeed_kts": self.airspeed_kts,
+            "indicated_airspeed_kts": indicated_airspeed_kts,
             "vertical_speed_fpm": self.vertical_speed_fpm,
             "pitch_deg": self.attitude.pitch_deg,
             "roll_deg": self.attitude.roll_deg,

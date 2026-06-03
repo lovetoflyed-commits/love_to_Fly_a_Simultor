@@ -6,7 +6,7 @@ from src.navigation.procedures import ProcedureDatabase
 from src.navigation.autopilot import APMode, Autopilot
 from src.navigation.gps import GPS
 from src.navigation.vor import VOR, VORReceiver
-from src.main import _build_default_flight_plan
+from src.main import _build_default_flight_plan, _spawn_lined_up_on_runway, _step_heading_bug
 
 
 def test_vor_radial_east_of_station() -> None:
@@ -58,3 +58,21 @@ def test_default_approach_procedure_is_sbgr_ils_10r() -> None:
     assert procedure is not None
     assert procedure.name == "ILS RWY 10R"
     assert procedure.waypoints[-1].name == "RW10R"
+
+
+def test_runway_spawn_lines_up_with_sbgr_10r() -> None:
+    fdm = FlightDynamics()
+    airport_db = AirportDatabase()
+    runway = next(rwy for rwy in airport_db.get_airport("SBGR").runways if rwy.name == "10R")  # type: ignore[union-attr]
+
+    _spawn_lined_up_on_runway(fdm, airport_db, "SBGR", "10R")
+
+    assert fdm.position.distance_nm(Position(runway.threshold_lat, runway.threshold_lon, runway.elevation_ft)) < 0.1
+    assert abs(fdm.attitude.yaw_deg - runway.heading_deg) < 1e-6
+    assert fdm.position.altitude_ft == runway.elevation_ft
+    assert fdm.airspeed_kts == 0.0
+
+
+def test_step_heading_bug_wraps() -> None:
+    assert _step_heading_bug(359.0, 2.0) == 1.0
+    assert _step_heading_bug(1.0, -3.0) == 358.0

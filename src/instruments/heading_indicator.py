@@ -17,9 +17,11 @@ class HeadingIndicator(Instrument):
     def __init__(self, width: int = 150, height: int = 150) -> None:
         super().__init__(width, height)
         self.heading_deg = 0.0
+        self.heading_bug_deg = 0.0
 
     def update(self, state: dict) -> None:
         self.heading_deg = float(state.get("heading_deg", 0.0))
+        self.heading_bug_deg = float(state.get("heading_bug_deg", self.heading_bug_deg))
 
     def draw(self) -> pygame.Surface:
         self.surface.fill((0, 0, 0, 0))
@@ -70,6 +72,29 @@ class HeadingIndicator(Instrument):
              (int(cx) + 7, int(cy) - radius + 16)],
         )
 
+        # ── Heading bug marker (cyan) ─────────────────────────────────────
+        bug_relative_deg = ((self.heading_bug_deg - self.heading_deg + 540.0) % 360.0) - 180.0
+        bug_angle = math.radians(90.0 - bug_relative_deg)
+        bug_outer_r = radius + 2
+        bug_inner_r = radius - 12
+        bug_center = (
+            cx + math.cos(bug_angle) * bug_outer_r,
+            cy - math.sin(bug_angle) * bug_outer_r,
+        )
+        left = (
+            bug_center[0] - math.cos(bug_angle) * 10 + math.cos(bug_angle + math.pi / 2) * 5,
+            bug_center[1] + math.sin(bug_angle) * 10 - math.sin(bug_angle + math.pi / 2) * 5,
+        )
+        right = (
+            bug_center[0] - math.cos(bug_angle) * 10 + math.cos(bug_angle - math.pi / 2) * 5,
+            bug_center[1] + math.sin(bug_angle) * 10 - math.sin(bug_angle - math.pi / 2) * 5,
+        )
+        tip = (
+            cx + math.cos(bug_angle) * bug_inner_r,
+            cy - math.sin(bug_angle) * bug_inner_r,
+        )
+        pygame.draw.polygon(self.surface, (70, 220, 255), [left, right, tip])
+
         # ── Digital heading box ──────────────────────────────────────────
         box_rect = pygame.Rect(int(cx) - 26, self.height - 30, 52, 22)
         pygame.draw.rect(self.surface, (15, 15, 15), box_rect, border_radius=3)
@@ -78,4 +103,3 @@ class HeadingIndicator(Instrument):
         self.surface.blit(text, text.get_rect(center=(int(cx), self.height - 19)))
 
         return self.surface
-

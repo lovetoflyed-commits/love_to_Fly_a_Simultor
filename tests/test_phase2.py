@@ -135,7 +135,7 @@ def test_main_menu_defaults():
     menu = MainMenu(1280, 720)
     assert not menu.done
     assert menu.selected_aircraft == "C152"
-    assert menu.selected_scenario == "ILS_APPROACH"
+    assert menu.selected_scenario == "RUNWAY_START"
 
 
 def test_main_menu_scenario_options_include_all():
@@ -143,6 +143,7 @@ def test_main_menu_scenario_options_include_all():
     pygame.init()
     menu = MainMenu(1280, 720)
     scenario_names = [opt[0] for opt in menu._SCENARIO_OPTIONS]
+    assert "RUNWAY_START" in scenario_names
     assert "ILS_APPROACH" in scenario_names
     assert "MISSED_APPROACH" in scenario_names
     assert "DIVERSION" in scenario_names

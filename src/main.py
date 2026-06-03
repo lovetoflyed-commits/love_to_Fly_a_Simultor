@@ -73,6 +73,7 @@ FULL_CIRCLE_DEG = 360.0
 HALF_CIRCLE_DEG = 180.0
 
 _SCENARIO_MAP = {
+    "RUNWAY_START": {"name": "Runway Start SBGR 10R", "events": []},
     "ILS_APPROACH": ILS_APPROACH,
     "ENGINE_FAILURE_SCENARIO": ENGINE_FAILURE_SCENARIO,
     "HOLDING_PATTERN": HOLDING_PATTERN,
@@ -119,6 +120,43 @@ def _nearby_runway_dicts(airport_db: AirportDatabase, fdm: FlightDynamics, max_n
                     "elevation_ft": rwy.elevation_ft,
                 })
     return result
+
+
+def _offset_position(lat: float, lon: float, distance_ft: float, bearing_deg: float) -> tuple[float, float]:
+    distance_m = distance_ft * 0.3048
+    bearing_rad = radians(bearing_deg)
+    d_lat = distance_m * cos(bearing_rad) / 111_320.0
+    d_lon = distance_m * sin(bearing_rad) / (111_320.0 * cos(radians(lat)))
+    return lat + d_lat, lon + d_lon
+
+
+def _step_heading_bug(current_heading_bug_deg: float, step_deg: float) -> float:
+    return (current_heading_bug_deg + step_deg) % FULL_CIRCLE_DEG
+
+
+def _spawn_lined_up_on_runway(fdm: FlightDynamics, airport_db: AirportDatabase, icao: str = "SBGR", runway_name: str = "10R") -> None:
+    airport = airport_db.get_airport(icao)
+    if airport is None:
+        return
+    runway = next((rwy for rwy in airport.runways if rwy.name == runway_name), None)
+    if runway is None:
+        return
+    spawn_lat, spawn_lon = _offset_position(
+        runway.threshold_lat,
+        runway.threshold_lon,
+        -300.0,
+        runway.heading_deg,
+    )
+    fdm.position.latitude_deg = spawn_lat
+    fdm.position.longitude_deg = spawn_lon
+    fdm.position.altitude_ft = runway.elevation_ft
+    fdm.attitude.yaw_deg = runway.heading_deg % FULL_CIRCLE_DEG
+    fdm.attitude.pitch_deg = 0.0
+    fdm.attitude.roll_deg = 0.0
+    fdm.velocity_body_ms = [0.0, 0.0, 0.0]
+    fdm.climb_rate_ms = 0.0
+    fdm.airspeed_kts = 0.0
+    fdm.vertical_speed_fpm = 0.0
 
 
 def main() -> None:
@@ -172,6 +210,8 @@ def main() -> None:
     scenario_engine = ScenarioEngine(atc, failure_manager)
     scenario_dict = _SCENARIO_MAP.get(selected_scenario_key, ILS_APPROACH)
     scenario_engine.load_scenario(scenario_dict)
+    if selected_scenario_key == "RUNWAY_START":
+        _spawn_lined_up_on_runway(fdm, airport_db)
     atc.generate_clearance(flight_plan)
     procedures.get_approaches("SBGR")
 
@@ -185,6 +225,7 @@ def main() -> None:
     magneto_index = 0
     starter_time_remaining = 0.0
     dg_heading_deg = fdm.attitude.yaw_deg
+    heading_bug_deg = fdm.attitude.yaw_deg
     user_controls = {"elevator": 0.0, "aileron": 0.0, "rudder": 0.0}
     flap_index = 0   # index into FLAP_POSITIONS
 
@@ -213,7 +254,7 @@ def main() -> None:
                 # ── Autopilot ─────────────────────────────────────────────
                 if event.key == pygame.K_h:
                     autopilot.engage(APMode.HDG)
-                    autopilot.set_target(heading=fdm.attitude.yaw_deg)
+                    autopilot.set_target(heading=heading_bug_deg)
                 elif event.key == pygame.K_l:
                     autopilot.engage(APMode.LNAV)
                 elif event.key == pygame.K_v:
@@ -227,6 +268,10 @@ def main() -> None:
                     atc.issue_approach_clearance("ILS 10R")
                 elif event.key == pygame.K_o:
                     autopilot.engage(APMode.OFF)
+                elif event.key in (pygame.K_j, pygame.K_k):
+                    step = 10.0 if pygame.key.get_mods() & pygame.KMOD_SHIFT else 1.0
+                    heading_bug_deg = _step_heading_bug(heading_bug_deg, step if event.key == pygame.K_k else -step)
+                    autopilot.set_target(heading=heading_bug_deg)
                 # ── Checklist ─────────────────────────────────────────────
                 elif event.key == pygame.K_SPACE:
                     checklist.advance()
@@ -340,7 +385,10 @@ def main() -> None:
         attitude_scale = failure_manager.modify_instrument_reading("attitude_indicator", 1.0)
         instrument_pitch = fdm_state["pitch_deg"] * attitude_scale
         instrument_roll = fdm_state["roll_deg"] * attitude_scale
-        instrument_airspeed = failure_manager.modify_instrument_reading("airspeed_indicator", fdm_state["airspeed_kts"])
+        instrument_airspeed = failure_manager.modify_instrument_reading(
+            "airspeed_indicator",
+            fdm_state.get("indicated_airspeed_kts", fdm_state["airspeed_kts"]),
+        )
         instrument_altitude = failure_manager.modify_instrument_reading("altimeter", fdm_state["altitude_ft"])
         instrument_vsi = failure_manager.modify_instrument_reading("vsi", fdm_state["vertical_speed_fpm"])
 
@@ -361,6 +409,7 @@ def main() -> None:
         state = {
             **fdm_state,
             "heading_deg": instrument_heading,
+            "heading_bug_deg": heading_bug_deg,
             "pitch_deg": instrument_pitch,
             "roll_deg": instrument_roll,
             "airspeed_kts": instrument_airspeed,
@@ -429,7 +478,7 @@ def main() -> None:
         info = info_font.render(
             f"Nearest: {state['nearest_airport']}  "
             f"Terrain: {terrain.get_elevation_ft(fdm.position.latitude_deg, fdm.position.longitude_deg):.0f}ft  "
-            f"[I]=APP  [F/G]=FLAPS  [B]=PROC  [P]=PAUSE  [D]=DEBRIEF  [ESC]=MENU",
+            f"[J/K]=HDG BUG (SHIFT ±10)  [I]=APP  [F/G]=FLAPS  [B]=PROC  [P]=PAUSE  [D]=DEBRIEF  [ESC]=MENU",
             True, (180, 180, 180)
         )
         screen.blit(info, (20, 700 - info.get_height()))
