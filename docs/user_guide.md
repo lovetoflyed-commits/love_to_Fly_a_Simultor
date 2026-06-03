@@ -29,7 +29,7 @@ python src/main.py
 
 ## Usage Notes
 
-- The simulator starts with a simple IFR route for the KSFO ILS 28L.
+- The simulator starts with a simple IFR route for the SBGR ILS 10R.
 - The moving map shows the active waypoint and leg.
 - The HUD shows active autopilot modes, next waypoint, and ETE.
 - ATC scenario messages appear along the bottom panel.

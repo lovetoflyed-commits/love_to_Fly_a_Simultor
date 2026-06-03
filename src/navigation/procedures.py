@@ -40,14 +40,14 @@ class ProcedureDatabase:
     def _built_in_procedures() -> list[Procedure]:
         return [
             Procedure(
-                name="ILS RWY 28L",
+                name="ILS RWY 10R",
                 type="APPROACH",
-                airport_icao="KSFO",
+                airport_icao="SBGR",
                 waypoints=[
-                    Waypoint("CEDES", 37.756, -122.470, 4000),
-                    Waypoint("FF28L", 37.683, -122.444, 3000),
-                    Waypoint("RW28L", 37.6136, -122.3572, 0),
+                    Waypoint("MOPAR", -23.239, -46.732, 5000),
+                    Waypoint("FF10R", -23.370, -46.560, 3500),
+                    Waypoint("RW10R", -23.4250, -46.4850, 2459),
                 ],
-                transitions={"SFO": ["CEDES", "FF28L", "RW28L"]},
+                transitions={"GRU": ["MOPAR", "FF10R", "RW10R"]},
             )
         ]

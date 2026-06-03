@@ -63,10 +63,10 @@ def _load_aircraft(config_name: str) -> Aircraft:
 
 def _build_default_flight_plan() -> FlightPlan:
     plan = FlightPlan([
-        Waypoint("PORTE", 37.712, -122.488, 3000),
-        Waypoint("CEDES", 37.756, -122.470, 3000),
-        Waypoint("FF28L", 37.683, -122.444, 1800),
-        Waypoint("RW28L", 37.6136, -122.3572, 13),
+        Waypoint("KUBOG", -23.121, -46.888, 7000),
+        Waypoint("MOPAR", -23.239, -46.732, 5000),
+        Waypoint("FF10R", -23.370, -46.560, 3500),
+        Waypoint("RW10R", -23.4250, -46.4850, 2459),
     ])
     return plan
 
@@ -96,13 +96,13 @@ def main() -> None:
     flight_plan = _build_default_flight_plan()
     procedures = ProcedureDatabase()
     vor_receiver = VORReceiver()
-    sfo_vor = VOR("SFO", 37.619, -122.374, 115.8)
-    vor_receiver.tune(115.8)
+    gru_vor = VOR("GRU", -23.4356, -46.4731, 116.9)
+    vor_receiver.tune(116.9)
     atc = ATCController()
     scenario_engine = ScenarioEngine(atc, failure_manager)
     scenario_engine.load_scenario(ILS_APPROACH)
     atc.generate_clearance(flight_plan)
-    procedures.get_approaches("KSFO")
+    procedures.get_approaches("SBGR")
 
     throttle_pct = 55.0
     user_controls = {"elevator": 0.0, "aileron": 0.0, "rudder": 0.0}

@@ -9,7 +9,7 @@ from ..models.position import Position
 class Terrain:
     def __init__(self) -> None:
         self.obstacles = [
-            (37.62, -122.38, 350),
+            (-23.44, -46.47, 3200),
             (33.942, -118.41, 500),
             (51.47, -0.44, 280),
         ]
