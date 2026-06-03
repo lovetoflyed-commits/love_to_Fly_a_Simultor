@@ -23,3 +23,15 @@ class HUD:
         surface.blit(altitude_bug, (20, 66))
         surface.blit(next_wp, (surface.get_width() - 170, 20))
         surface.blit(ete, (surface.get_width() - 170, 42))
+
+        # Flap position
+        flaps = float(state.get("flaps_deg", 0.0))
+        if flaps > 0:
+            flap_color = (255, 200, 60) if flaps <= 20 else (255, 100, 60)
+            fl = self.small_font.render(f"FLAPS {flaps:.0f}°", True, flap_color)
+            surface.blit(fl, (20, 86))
+
+        # Pause indicator
+        if state.get("paused", False):
+            pause_text = self.font.render("⏸  PAUSED  ⏸", True, (255, 255, 100))
+            surface.blit(pause_text, pause_text.get_rect(center=(surface.get_width() // 2, 20)))
