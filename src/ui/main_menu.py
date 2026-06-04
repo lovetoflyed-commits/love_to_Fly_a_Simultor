@@ -22,12 +22,14 @@ class MainMenu:
     ]
 
     _SCENARIO_OPTIONS = [
-        ("ILS_APPROACH",        "ILS 10R SBGR approach"),
-        ("MISSED_APPROACH",     "Missed approach & go-around"),
-        ("HOLDING_PATTERN",     "Holding pattern – partial panel"),
+        ("RUNWAY_START",            "Runway 10R SBGR start (lined up)"),
+        ("ILS_APPROACH",            "ILS 10R SBGR approach"),
+        ("MISSED_APPROACH",         "Missed approach & go-around"),
+        ("HOLDING_PATTERN",         "Holding pattern – partial panel"),
         ("ENGINE_FAILURE_SCENARIO", "Engine failure & diversion"),
-        ("PARTIAL_PANEL",       "Partial panel recovery"),
-        ("DIVERSION",           "Weather diversion to SBSP"),
+        ("PARTIAL_PANEL",           "Partial panel recovery"),
+        ("DIVERSION",               "Weather diversion to SBSP"),
+        ("TERRAIN_AWARENESS_SBGR",  "Terrain awareness – SBGR area (relevo)"),
     ]
 
     def __init__(self, screen_w: int, screen_h: int) -> None:
@@ -44,7 +46,7 @@ class MainMenu:
         self._focus = "aircraft"  # "aircraft" | "scenario" | "start"
         self.done = False
         self.selected_aircraft = "C152"
-        self.selected_scenario = "ILS_APPROACH"
+        self.selected_scenario = "RUNWAY_START"
 
     # ── Public ────────────────────────────────────────────────────────────────
 

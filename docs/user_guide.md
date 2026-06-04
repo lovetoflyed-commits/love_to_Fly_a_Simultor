@@ -21,6 +21,8 @@ python src/main.py
 | Rudder right / left | X / Z |
 | Throttle up / down | = / - |
 | Engage HDG mode | H |
+| Heading bug -1° / +1° | J / K |
+| Heading bug -10° / +10° | Shift+J / Shift+K |
 | Engage LNAV mode | L |
 | Engage VS mode | V |
 | Engage ALT hold | A |
@@ -35,10 +37,11 @@ python src/main.py
 
 ## Usage Notes
 
-- The simulator starts with a simple IFR route for the SBGR ILS 10R.
+- The main menu includes a **Runway 10R SBGR start (lined up)** mission option.
+- Default mission selection is runway start, so the aircraft begins lined up on SBGR RWY 10R.
 - The simulator now starts in a cold-and-dark style cockpit state (master OFF, avionics OFF, magnetos OFF, throttle idle).
 - The moving map shows the active waypoint and leg.
-- The HUD shows active autopilot modes, next waypoint, and ETE.
+- The HUD shows active autopilot modes, selected HDG bug, next waypoint, and ETE.
 - ATC scenario messages appear along the bottom panel.
 - Checklist progress is displayed on the right side of the message strip.
 

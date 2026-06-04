@@ -228,3 +228,9 @@ def test_tachometer_redline_is_within_scale() -> None:
     # Redline (2750 RPM) should produce an angle between the two end-stops
     assert 225.0 - 270.0 < angle < 225.0
 
+
+def test_heading_indicator_tracks_heading_bug_state() -> None:
+    heading = HeadingIndicator()
+    heading.update({"heading_deg": 90.0, "heading_bug_deg": 120.0})
+    assert heading.heading_deg == 90.0
+    assert heading.heading_bug_deg == 120.0

@@ -30,7 +30,7 @@ if __package__ in {None, ""}:
     from src.scenarios.scenario_engine import ScenarioEngine
     from src.scenarios.training_scenarios import (
         ILS_APPROACH, ENGINE_FAILURE_SCENARIO, HOLDING_PATTERN,
-        PARTIAL_PANEL, MISSED_APPROACH, DIVERSION,
+        PARTIAL_PANEL, MISSED_APPROACH, DIVERSION, TERRAIN_AWARENESS_SBGR,
     )
     from src.ui.cockpit_view import CockpitView
     from src.ui.hud import HUD
@@ -58,7 +58,7 @@ else:
     from .scenarios.scenario_engine import ScenarioEngine
     from .scenarios.training_scenarios import (
         ILS_APPROACH, ENGINE_FAILURE_SCENARIO, HOLDING_PATTERN,
-        PARTIAL_PANEL, MISSED_APPROACH, DIVERSION,
+        PARTIAL_PANEL, MISSED_APPROACH, DIVERSION, TERRAIN_AWARENESS_SBGR,
     )
     from .ui.cockpit_view import CockpitView
     from .ui.hud import HUD
@@ -71,14 +71,19 @@ HEADING_WRAP_OFFSET_DEG = 540.0
 DG_MINIMUM_SUCTION_INHG = 3.5
 FULL_CIRCLE_DEG = 360.0
 HALF_CIRCLE_DEG = 180.0
+HEADING_BUG_STEP_SMALL_DEG = 1.0
+HEADING_BUG_STEP_LARGE_DEG = 10.0
+RUNWAY_SPAWN_OFFSET_FT = -300.0
 
 _SCENARIO_MAP = {
+    "RUNWAY_START": {"name": "Runway Start SBGR 10R", "events": []},
     "ILS_APPROACH": ILS_APPROACH,
     "ENGINE_FAILURE_SCENARIO": ENGINE_FAILURE_SCENARIO,
     "HOLDING_PATTERN": HOLDING_PATTERN,
     "PARTIAL_PANEL": PARTIAL_PANEL,
     "MISSED_APPROACH": MISSED_APPROACH,
     "DIVERSION": DIVERSION,
+    "TERRAIN_AWARENESS_SBGR": TERRAIN_AWARENESS_SBGR,
 }
 
 # Radio tuning step sizes
@@ -119,6 +124,44 @@ def _nearby_runway_dicts(airport_db: AirportDatabase, fdm: FlightDynamics, max_n
                     "elevation_ft": rwy.elevation_ft,
                 })
     return result
+
+
+def _offset_position(lat: float, lon: float, distance_ft: float, bearing_deg: float) -> tuple[float, float]:
+    """Return a new lat/lon from a start point, distance in feet, and bearing in degrees."""
+    distance_m = distance_ft * 0.3048
+    bearing_rad = radians(bearing_deg)
+    d_lat = distance_m * cos(bearing_rad) / 111_320.0
+    d_lon = distance_m * sin(bearing_rad) / (111_320.0 * cos(radians(lat)))
+    return lat + d_lat, lon + d_lon
+
+
+def _step_heading_bug(current_heading_bug_deg: float, step_deg: float) -> float:
+    return (current_heading_bug_deg + step_deg) % FULL_CIRCLE_DEG
+
+
+def _spawn_lined_up_on_runway(fdm: FlightDynamics, airport_db: AirportDatabase, icao: str = "SBGR", runway_name: str = "10R") -> None:
+    airport = airport_db.get_airport(icao)
+    if airport is None:
+        return
+    runway = next((rwy for rwy in airport.runways if rwy.name == runway_name), None)
+    if runway is None:
+        return
+    spawn_lat, spawn_lon = _offset_position(
+        runway.threshold_lat,
+        runway.threshold_lon,
+        RUNWAY_SPAWN_OFFSET_FT,
+        runway.heading_deg,
+    )
+    fdm.position.latitude_deg = spawn_lat
+    fdm.position.longitude_deg = spawn_lon
+    fdm.position.altitude_ft = runway.elevation_ft
+    fdm.attitude.yaw_deg = runway.heading_deg % FULL_CIRCLE_DEG
+    fdm.attitude.pitch_deg = 0.0
+    fdm.attitude.roll_deg = 0.0
+    fdm.velocity_body_ms = [0.0, 0.0, 0.0]
+    fdm.climb_rate_ms = 0.0
+    fdm.airspeed_kts = 0.0
+    fdm.vertical_speed_fpm = 0.0
 
 
 def main() -> None:
@@ -172,6 +215,8 @@ def main() -> None:
     scenario_engine = ScenarioEngine(atc, failure_manager)
     scenario_dict = _SCENARIO_MAP.get(selected_scenario_key, ILS_APPROACH)
     scenario_engine.load_scenario(scenario_dict)
+    if selected_scenario_key == "RUNWAY_START":
+        _spawn_lined_up_on_runway(fdm, airport_db)
     atc.generate_clearance(flight_plan)
     procedures.get_approaches("SBGR")
 
@@ -185,6 +230,7 @@ def main() -> None:
     magneto_index = 0
     starter_time_remaining = 0.0
     dg_heading_deg = fdm.attitude.yaw_deg
+    heading_bug_deg = fdm.attitude.yaw_deg
     user_controls = {"elevator": 0.0, "aileron": 0.0, "rudder": 0.0}
     flap_index = 0   # index into FLAP_POSITIONS
 
@@ -193,12 +239,46 @@ def main() -> None:
     nav1_mhz = 110.30
     squawk_index = 0  # index into _SQUAWK_CODES
     squawk = _SQUAWK_CODES[squawk_index]
+    baro_inhg = 29.92
 
     # UI state
     paused = False
     show_procedure = False
     show_debrief = False
     debrief_text: str | None = None
+
+    def _apply_instrument_changes(changes: dict) -> None:
+        """Apply a cockpit.handle_event() result dict to the current flight state."""
+        nonlocal heading_bug_deg, baro_inhg, throttle_pct, com1_mhz, nav1_mhz
+        nonlocal squawk_index, squawk
+        if "heading_bug_delta" in changes:
+            heading_bug_deg = _step_heading_bug(
+                heading_bug_deg, changes["heading_bug_delta"]
+            )
+            autopilot.set_target(heading=heading_bug_deg)
+        if "baro_delta" in changes:
+            baro_inhg = round(
+                max(28.00, min(31.00, baro_inhg + changes["baro_delta"])), 2
+            )
+        if "throttle_delta" in changes:
+            throttle_pct = max(
+                0.0, min(100.0, throttle_pct + changes["throttle_delta"])
+            )
+        if "com1_delta" in changes:
+            com1_mhz = round(
+                max(_COM_MIN, min(_COM_MAX, com1_mhz + changes["com1_delta"])), 3
+            )
+        if "nav1_delta" in changes:
+            nav1_mhz = round(
+                max(_NAV_MIN, min(_NAV_MAX, nav1_mhz + changes["nav1_delta"])), 2
+            )
+            vor_receiver.tune(nav1_mhz)
+        if changes.get("squawk_next"):
+            squawk_index = (squawk_index + 1) % len(_SQUAWK_CODES)
+            squawk = _SQUAWK_CODES[squawk_index]
+        elif changes.get("squawk_prev"):
+            squawk_index = (squawk_index - 1) % len(_SQUAWK_CODES)
+            squawk = _SQUAWK_CODES[squawk_index]
 
     running = True
     while running:
@@ -213,7 +293,7 @@ def main() -> None:
                 # ── Autopilot ─────────────────────────────────────────────
                 if event.key == pygame.K_h:
                     autopilot.engage(APMode.HDG)
-                    autopilot.set_target(heading=fdm.attitude.yaw_deg)
+                    autopilot.set_target(heading=heading_bug_deg)
                 elif event.key == pygame.K_l:
                     autopilot.engage(APMode.LNAV)
                 elif event.key == pygame.K_v:
@@ -227,6 +307,10 @@ def main() -> None:
                     atc.issue_approach_clearance("ILS 10R")
                 elif event.key == pygame.K_o:
                     autopilot.engage(APMode.OFF)
+                elif event.key in (pygame.K_j, pygame.K_k):
+                    step = HEADING_BUG_STEP_LARGE_DEG if pygame.key.get_mods() & pygame.KMOD_SHIFT else HEADING_BUG_STEP_SMALL_DEG
+                    heading_bug_deg = _step_heading_bug(heading_bug_deg, step if event.key == pygame.K_k else -step)
+                    autopilot.set_target(heading=heading_bug_deg)
                 # ── Checklist ─────────────────────────────────────────────
                 elif event.key == pygame.K_SPACE:
                     checklist.advance()
@@ -281,6 +365,14 @@ def main() -> None:
                 # ── Main menu (ESC) ───────────────────────────────────────
                 elif event.key == pygame.K_ESCAPE:
                     running = False
+
+            # ── Mouse scroll / wheel on instruments ───────────────────────
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
+                _apply_instrument_changes(cockpit.handle_event(event))
+
+            # Support modern pygame MOUSEWHEEL event (pygame ≥ 2.0)
+            elif event.type == getattr(pygame, "MOUSEWHEEL", -1):
+                _apply_instrument_changes(cockpit.handle_event(event))
 
         if not paused:
             keys = pygame.key.get_pressed()
@@ -340,7 +432,10 @@ def main() -> None:
         attitude_scale = failure_manager.modify_instrument_reading("attitude_indicator", 1.0)
         instrument_pitch = fdm_state["pitch_deg"] * attitude_scale
         instrument_roll = fdm_state["roll_deg"] * attitude_scale
-        instrument_airspeed = failure_manager.modify_instrument_reading("airspeed_indicator", fdm_state["airspeed_kts"])
+        instrument_airspeed = failure_manager.modify_instrument_reading(
+            "airspeed_indicator",
+            fdm_state.get("indicated_airspeed_kts", fdm_state["airspeed_kts"]),
+        )
         instrument_altitude = failure_manager.modify_instrument_reading("altimeter", fdm_state["altitude_ft"])
         instrument_vsi = failure_manager.modify_instrument_reading("vsi", fdm_state["vertical_speed_fpm"])
 
@@ -361,6 +456,7 @@ def main() -> None:
         state = {
             **fdm_state,
             "heading_deg": instrument_heading,
+            "heading_bug_deg": heading_bug_deg,
             "pitch_deg": instrument_pitch,
             "roll_deg": instrument_roll,
             "airspeed_kts": instrument_airspeed,
@@ -389,7 +485,7 @@ def main() -> None:
             "magneto_position": magneto_positions[magneto_index],
             "mixture_pct": mixture_pct,
             "carb_heat_on": carb_heat_on,
-            "baro_inhg": 29.92,
+            "baro_inhg": baro_inhg,
             "next_waypoint": next_waypoint,
             "atc_messages": scenario_engine.get_active_messages(),
             "checklist_status": f"{checklist.name}: {'COMPLETE' if checklist.is_complete else checklist.items[min(checklist.current_item_index, len(checklist.items)-1)].text}",
@@ -403,6 +499,12 @@ def main() -> None:
             # Phase 2: visual
             "weather_ceiling_ft": weather.ceiling_ft,
             "nearby_runways": _nearby_runway_dicts(airport_db, fdm),
+            "terrain_ft": terrain.get_elevation_ft(
+                fdm.position.latitude_deg, fdm.position.longitude_deg
+            ),
+            "terrain_objects": terrain.get_objects_in_range(
+                fdm.position.latitude_deg, fdm.position.longitude_deg, 40.0
+            ),
             # Phase 4: radio
             "com1_mhz": com1_mhz,
             "nav1_mhz": nav1_mhz,
@@ -425,14 +527,6 @@ def main() -> None:
         if show_procedure:
             procedure_viewer.draw(screen)
 
-        info_font = pygame.font.SysFont("arial", 14)
-        info = info_font.render(
-            f"Nearest: {state['nearest_airport']}  "
-            f"Terrain: {terrain.get_elevation_ft(fdm.position.latitude_deg, fdm.position.longitude_deg):.0f}ft  "
-            f"[I]=APP  [F/G]=FLAPS  [B]=PROC  [P]=PAUSE  [D]=DEBRIEF  [ESC]=MENU",
-            True, (180, 180, 180)
-        )
-        screen.blit(info, (20, 700 - info.get_height()))
         pygame.display.flip()
 
     pygame.quit()
