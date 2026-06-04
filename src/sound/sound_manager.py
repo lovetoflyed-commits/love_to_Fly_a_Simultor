@@ -184,12 +184,6 @@ class SoundManager:
             elif delta <= -THROTTLE_EVENT_THRESHOLD:
                 self._play_transient("throttle_down")
 
-        # Mixture cutoff – hard stop before engine_running flag clears
-        if (mixture_pct <= 5.0
-                and self._engine_state == self._ENGINE_RUNNING
-                and not engine_running):
-            self._on_engine_stop()
-
         # ------------------------------------------------------------------
         # Alert / warning audio
         # ------------------------------------------------------------------

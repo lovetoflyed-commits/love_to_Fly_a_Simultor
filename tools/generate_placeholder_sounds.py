@@ -4,7 +4,7 @@ These are synthetic sounds made with numpy.  They are fully open/public-domain
 and can be replaced with higher-fidelity recordings at any time.
 
 Run:
-    python /tmp/gen_sounds.py /path/to/assets/sounds/
+    python tools/generate_placeholder_sounds.py assets/sounds/
 """
 from __future__ import annotations
 

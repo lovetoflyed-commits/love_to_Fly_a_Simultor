@@ -169,8 +169,12 @@ class TestThrottleEvents:
             ch = MagicMock()
             ch.get_busy.return_value = False
             setattr(sm, attr, ch)
-        sm._engine_state = "running"
-        sm._prev_throttle_pct = 50.0
+        # Use the proper transition to reach running state
+        sm.update(_base_state(engine_running=True, rpm=700.0, throttle_pct=50.0), dt=0.016)
+        # Reset call history so only the next update's calls are observed
+        sm._ch_transient.play.reset_mock()
+        sm._ch_idle.play.reset_mock()
+        sm._ch_high.play.reset_mock()
         return sm
 
     def test_throttle_up_fires_above_threshold(self):
