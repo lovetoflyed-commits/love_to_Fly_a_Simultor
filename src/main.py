@@ -28,6 +28,7 @@ if __package__ in {None, ""}:
     from src.scenarios.atc import ATCController
     from src.scenarios.failures import FailureManager
     from src.scenarios.scenario_engine import ScenarioEngine
+    from src.sound.sound_manager import SoundManager
     from src.scenarios.training_scenarios import (
         ILS_APPROACH, ENGINE_FAILURE_SCENARIO, HOLDING_PATTERN,
         PARTIAL_PANEL, MISSED_APPROACH, DIVERSION, TERRAIN_AWARENESS_SBGR,
@@ -64,6 +65,7 @@ else:
     from .ui.hud import HUD
     from .ui.main_menu import MainMenu
     from .ui.settings import Settings
+    from .sound.sound_manager import SoundManager
 
 DG_FOLLOW_GAIN = 0.7
 DG_DRIFT_DEG_PER_SEC = 0.03
@@ -169,6 +171,10 @@ def main() -> None:
     screen = pygame.display.set_mode((1280, 720))
     pygame.display.set_caption("IFR Flight Simulator")
     clock = pygame.time.Clock()
+
+    # ── Sound system ──────────────────────────────────────────────────────────
+    _assets_dir = Path(__file__).resolve().parent.parent / "assets"
+    sound_manager = SoundManager(_assets_dir)
 
     # ── Main Menu ─────────────────────────────────────────────────────────────
     menu = MainMenu(1280, 720)
@@ -482,6 +488,8 @@ def main() -> None:
             "avionics_on": avionics_on,
             "avionics_powered": engine.avionics_powered,
             "engine_running": engine.engine_running,
+            "starter_engaged": starter_time_remaining > 0.0,
+            "throttle_pct": throttle_pct,
             "magneto_position": magneto_positions[magneto_index],
             "mixture_pct": mixture_pct,
             "carb_heat_on": carb_heat_on,
@@ -523,12 +531,16 @@ def main() -> None:
         cockpit.draw(screen)
         hud.draw(screen, state, autopilot)
 
+        # ── Sound update ──────────────────────────────────────────────────
+        sound_manager.update(state, dt)
+
         # Phase 6: procedure viewer overlay
         if show_procedure:
             procedure_viewer.draw(screen)
 
         pygame.display.flip()
 
+    sound_manager.shutdown()
     pygame.quit()
 
 
