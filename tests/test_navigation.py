@@ -61,16 +61,26 @@ def test_default_approach_procedure_is_sbgr_ils_10r() -> None:
 
 
 def test_runway_spawn_lines_up_with_sbgr_10r() -> None:
+    from src.main import _offset_position, RUNWAY_SPAWN_OFFSET_FT
+
     fdm = FlightDynamics()
     airport_db = AirportDatabase()
     runway = next(rwy for rwy in airport_db.get_airport("SBGR").runways if rwy.name == "10R")  # type: ignore[union-attr]
 
     _spawn_lined_up_on_runway(fdm, airport_db, "SBGR", "10R")
 
-    assert fdm.position.distance_nm(Position(runway.threshold_lat, runway.threshold_lon, runway.elevation_ft)) < 0.1
+    # Aircraft must be ON the runway surface (positive offset from threshold)
+    exp_lat, exp_lon = _offset_position(
+        runway.threshold_lat, runway.threshold_lon,
+        RUNWAY_SPAWN_OFFSET_FT, runway.heading_deg,
+    )
+    assert RUNWAY_SPAWN_OFFSET_FT > 0, "spawn offset must be positive to place aircraft on the runway"
+    expected_pos = Position(exp_lat, exp_lon, runway.elevation_ft)
+    assert fdm.position.distance_nm(expected_pos) < 0.01  # within ~60 ft of expected spawn
     assert abs(fdm.attitude.yaw_deg - runway.heading_deg) < 1e-6
     assert fdm.position.altitude_ft == runway.elevation_ft
     assert fdm.airspeed_kts == 0.0
+    assert fdm.velocity_body_ms == [0.0, 0.0, 0.0]
 
 
 def test_step_heading_bug_wraps() -> None:

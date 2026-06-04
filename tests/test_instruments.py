@@ -234,3 +234,78 @@ def test_heading_indicator_tracks_heading_bug_state() -> None:
     heading.update({"heading_deg": 90.0, "heading_bug_deg": 120.0})
     assert heading.heading_deg == 90.0
     assert heading.heading_bug_deg == 120.0
+
+
+# ── Mouse click instrument interaction tests ─────────────────────────────────
+
+def _make_mouse_event(button: int, pos: tuple[int, int]) -> pygame.event.Event:
+    """Create a synthetic MOUSEBUTTONDOWN event."""
+    return pygame.event.Event(
+        pygame.MOUSEBUTTONDOWN,
+        {"button": button, "pos": pos},
+    )
+
+
+def test_cockpit_left_click_increments_heading_bug() -> None:
+    """Left-clicking on the heading indicator should return a positive heading_bug_delta."""
+    cockpit = CockpitView(1280, 720)
+    from src.ui.cockpit_view import _COL_DI, _ROW2_Y, _INST_SIZE
+    mx = _COL_DI + _INST_SIZE // 2
+    my = _ROW2_Y + _INST_SIZE // 2
+    changes = cockpit.handle_event(_make_mouse_event(1, (mx, my)))
+    assert "heading_bug_delta" in changes
+    assert changes["heading_bug_delta"] > 0
+
+
+def test_cockpit_right_click_decrements_heading_bug() -> None:
+    """Right-clicking on the heading indicator should return a negative heading_bug_delta."""
+    cockpit = CockpitView(1280, 720)
+    from src.ui.cockpit_view import _COL_DI, _ROW2_Y, _INST_SIZE
+    mx = _COL_DI + _INST_SIZE // 2
+    my = _ROW2_Y + _INST_SIZE // 2
+    changes = cockpit.handle_event(_make_mouse_event(3, (mx, my)))
+    assert "heading_bug_delta" in changes
+    assert changes["heading_bug_delta"] < 0
+
+
+def test_cockpit_left_click_increments_throttle() -> None:
+    """Left-clicking the tachometer should return a positive throttle_delta."""
+    cockpit = CockpitView(1280, 720)
+    from src.ui.cockpit_view import _TACH_X, _TACH_Y, _INST_SIZE
+    mx = _TACH_X + _INST_SIZE // 2
+    my = _TACH_Y + _INST_SIZE // 2
+    changes = cockpit.handle_event(_make_mouse_event(1, (mx, my)))
+    assert "throttle_delta" in changes
+    assert changes["throttle_delta"] > 0
+
+
+def test_cockpit_right_click_decrements_baro() -> None:
+    """Right-clicking the altimeter should return a negative baro_delta."""
+    cockpit = CockpitView(1280, 720)
+    from src.ui.cockpit_view import _COL_ALT, _ROW1_Y, _INST_SIZE
+    mx = _COL_ALT + _INST_SIZE // 2
+    my = _ROW1_Y + _INST_SIZE // 2
+    changes = cockpit.handle_event(_make_mouse_event(3, (mx, my)))
+    assert "baro_delta" in changes
+    assert changes["baro_delta"] < 0
+
+
+def test_cockpit_scroll_up_increments_baro() -> None:
+    """Scroll-up (legacy button 4) on the altimeter should give positive baro_delta."""
+    cockpit = CockpitView(1280, 720)
+    from src.ui.cockpit_view import _COL_ALT, _ROW1_Y, _INST_SIZE
+    mx = _COL_ALT + _INST_SIZE // 2
+    my = _ROW1_Y + _INST_SIZE // 2
+    changes = cockpit.handle_event(_make_mouse_event(4, (mx, my)))
+    assert "baro_delta" in changes
+    assert changes["baro_delta"] > 0
+
+
+def test_cockpit_middle_click_returns_empty() -> None:
+    """Middle-click (button 2) on an instrument should return no changes."""
+    cockpit = CockpitView(1280, 720)
+    from src.ui.cockpit_view import _COL_ALT, _ROW1_Y, _INST_SIZE
+    mx = _COL_ALT + _INST_SIZE // 2
+    my = _ROW1_Y + _INST_SIZE // 2
+    changes = cockpit.handle_event(_make_mouse_event(2, (mx, my)))
+    assert changes == {}

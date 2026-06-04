@@ -238,25 +238,42 @@ class CockpitView:
         # ── Ground colour depends on rough terrain altitude ───────────────────
         alt_ft = self._altitude_ft
         if alt_ft < 500:
-            ground_color = (35, 100, 35)        # low/green
+            ground_color = (34, 92, 34)         # low / green savanna
         elif alt_ft < 2000:
-            ground_color = (70, 95, 55)         # mid elevation
+            ground_color = (65, 88, 48)         # mid elevation scrubland
         elif alt_ft < 8000:
-            ground_color = (100, 80, 60)        # brown upland
+            ground_color = (92, 74, 52)         # brown upland
         else:
-            ground_color = (130, 120, 110)      # high / rocky
+            ground_color = (118, 108, 96)       # high / rocky
 
-        # ── Sky gradient ─────────────────────────────────────────────────────
-        sky_top = (20, 40, 100)
-        sky_horizon = (130, 185, 230)
+        # ── 3-stop sky gradient: deep navy → royal blue → pale horizon blue ──
+        sky_top    = (8,  22,  80)
+        sky_mid    = (42, 98, 188)
+        sky_horiz  = (148, 196, 232)
         sky_surf = pygame.Surface((W, H))
         for y in range(H):
-            t = y / H
-            r = int(sky_top[0] + t * (sky_horizon[0] - sky_top[0]))
-            g = int(sky_top[1] + t * (sky_horizon[1] - sky_top[1]))
-            b = int(sky_top[2] + t * (sky_horizon[2] - sky_top[2]))
+            t = y / max(H - 1, 1)
+            if t < 0.4:                         # top → mid
+                s = t / 0.4
+                r = int(sky_top[0] + s * (sky_mid[0] - sky_top[0]))
+                g = int(sky_top[1] + s * (sky_mid[1] - sky_top[1]))
+                b = int(sky_top[2] + s * (sky_mid[2] - sky_top[2]))
+            else:                               # mid → horizon
+                s = (t - 0.4) / 0.6
+                r = int(sky_mid[0] + s * (sky_horiz[0] - sky_mid[0]))
+                g = int(sky_mid[1] + s * (sky_horiz[1] - sky_mid[1]))
+                b = int(sky_mid[2] + s * (sky_horiz[2] - sky_mid[2]))
             pygame.draw.line(sky_surf, (r, g, b), (0, y), (W, y))
         screen.blit(sky_surf, (0, 0))
+
+        # ── Sun disk (above horizon, slightly right of centre) ────────────────
+        sun_sx = int(W * 0.68)
+        sun_sy = int(H * 0.22)
+        for radius, alpha in [(38, 18), (28, 35), (20, 70), (14, 130), (9, 210)]:
+            sun_g = pygame.Surface((radius * 2, radius * 2), pygame.SRCALPHA)
+            pygame.draw.circle(sun_g, (255, 248, 200, alpha), (radius, radius), radius)
+            screen.blit(sun_g, (sun_sx - radius, sun_sy - radius))
+        pygame.draw.circle(screen, (255, 255, 230), (sun_sx, sun_sy), 8)
 
         # ── Tilted horizon line ───────────────────────────────────────────────
         cx, cy_base = W // 2, _WINDSHIELD_H // 2
@@ -265,16 +282,29 @@ class CockpitView:
             W, horizon_cy, self._roll_deg
         )
 
-        # Ground polygon
+        # Ground polygon with atmospheric fade toward horizon
         ground_pts = [(hl_x, hl_y), (hr_x, hr_y), (W, H), (0, H)]
         pygame.draw.polygon(screen, ground_color, ground_pts)
 
-        # Perspective grid on ground
+        # Blend horizon fade on the ground surface (lighter / hazier near top)
+        horiz_y = int(min(hl_y, hr_y))
+        fade_h = max(1, H - horiz_y)
+        ground_fade = pygame.Surface((W, fade_h), pygame.SRCALPHA)
+        for yy in range(min(fade_h, 80)):
+            t = 1.0 - yy / 80.0          # strongest near top of ground
+            alpha = int(t * 110)
+            pygame.draw.line(ground_fade, (200, 210, 195, alpha), (0, yy), (W, yy))
+        screen.blit(ground_fade, (0, horiz_y))
+
+        # Perspective grid on ground (finer, more retro-sim feel)
         vp = (cx, int(horizon_cy))
-        ground_line_color = tuple(max(0, c - 20) for c in ground_color)
-        for gx in range(0, W + 1, 80):
+        grid_r = max(0, ground_color[0] - 14)
+        grid_g = max(0, ground_color[1] - 12)
+        grid_b = max(0, ground_color[2] - 8)
+        ground_line_color = (grid_r, grid_g, grid_b)
+        for gx in range(0, W + 1, 60):
             pygame.draw.line(screen, ground_line_color, vp, (gx, H), 1)
-        for yy in range(int(max(hl_y, hr_y)), H, 40):
+        for yy in range(int(max(hl_y, hr_y)), H, 30):
             pygame.draw.line(screen, ground_line_color, (0, yy), (W, yy), 1)
 
         # ── Runway rendering ─────────────────────────────────────────────────
@@ -288,20 +318,27 @@ class CockpitView:
         for obj in self._terrain_objects:
             self._draw_terrain_object(screen, obj, W, H, horizon_cy, heading_rad, pitch_rad, roll_rad, cx)
 
-        # Horizon line
-        pygame.draw.line(screen, (230, 220, 190), (int(hl_x), int(hl_y)), (int(hr_x), int(hr_y)), 2)
+        # Horizon line (warm golden tint — retro sim classic)
+        pygame.draw.line(screen, (235, 215, 160), (int(hl_x), int(hl_y)), (int(hr_x), int(hr_y)), 2)
 
         # ── Cloud layer ──────────────────────────────────────────────────────
         if self._weather_ceiling_ft is not None:
             self._draw_cloud_layer(screen, W, H, horizon_cy)
 
-        # Haze layer at horizon
-        haze_h = 18
+        # Horizon haze band (wider + warm golden tint at base)
+        haze_h = 30
         haze_y = int(min(hl_y, hr_y)) - haze_h // 2
         haze_surf = pygame.Surface((W, haze_h), pygame.SRCALPHA)
         for yy in range(haze_h):
-            alpha = int(80 * (1 - abs(yy / haze_h - 0.5) * 2))
-            pygame.draw.line(haze_surf, (210, 230, 255, alpha), (0, yy), (W, yy))
+            t = yy / max(haze_h - 1, 1)    # 0=top of band, 1=bottom
+            # Blue atmospheric haze on sky side, warm amber glow on ground side
+            if t < 0.5:
+                r, g, b = 195, 220, 255
+                alpha = int(90 * (1.0 - abs(t / 0.5 - 0.5) * 2 + 0.5))
+            else:
+                r, g, b = 235, 210, 160
+                alpha = int(70 * (1.0 - (t - 0.5) * 2))
+            pygame.draw.line(haze_surf, (r, g, b, max(0, alpha)), (0, yy), (W, yy))
         screen.blit(haze_surf, (0, max(0, haze_y)))
 
         # A-pillars
@@ -366,6 +403,51 @@ class CockpitView:
         sy = horizon_cy - (up3 / fwd2) * focal
         return sx, sy
 
+    # ── Body-frame helpers for near-plane clipping ──────────────────────────
+
+    def _world_to_body(
+        self,
+        lat: float,
+        lon: float,
+        alt_ft: float,
+        heading_rad: float,
+        pitch_rad: float,
+        roll_rad: float,
+    ) -> tuple[float, float, float]:
+        """Convert a world lat/lon/alt to aircraft body-frame (fwd, right, up) metres."""
+        lat0 = math.radians(self._position.latitude_deg)
+        north_m = (lat - self._position.latitude_deg) * 111_320.0
+        east_m = (lon - self._position.longitude_deg) * 111_320.0 * math.cos(lat0)
+        up_m = (alt_ft - self._altitude_ft) * 0.3048
+
+        fwd = north_m * math.cos(heading_rad) + east_m * math.sin(heading_rad)
+        right = -north_m * math.sin(heading_rad) + east_m * math.cos(heading_rad)
+        up = up_m
+
+        fwd2 = fwd * math.cos(pitch_rad) + up * math.sin(pitch_rad)
+        up2 = -fwd * math.sin(pitch_rad) + up * math.cos(pitch_rad)
+
+        right2 = right * math.cos(roll_rad) + up2 * math.sin(roll_rad)
+        up3 = -right * math.sin(roll_rad) + up2 * math.cos(roll_rad)
+
+        return fwd2, right2, up3
+
+    def _project_body(
+        self,
+        fwd: float,
+        right: float,
+        up: float,
+        screen_cx: float,
+        horizon_cy: float,
+        focal: float = 620.0,
+    ) -> tuple[float, float] | None:
+        """Project body-frame (fwd,right,up) to screen pixel coords."""
+        if fwd < 1.0:
+            return None
+        sx = screen_cx + (right / fwd) * focal
+        sy = horizon_cy - (up / fwd) * focal
+        return sx, sy
+
     def _draw_runway(
         self,
         screen: pygame.Surface,
@@ -374,60 +456,166 @@ class CockpitView:
         H: int,
         horizon_cy: float,
     ) -> None:
-        """Draw a runway as a perspective-projected trapezoid."""
+        """Draw a runway with retro-sim-quality markings and near-plane clipping.
+
+        Near corners behind the aircraft (e.g. when parked on the runway) are
+        clipped along the edge to the far corner so the slab is still drawn.
+        """
         heading_rad = math.radians(self._heading_deg)
         pitch_rad = math.radians(self._pitch_deg)
-        roll_rad = math.radians(-self._roll_deg)   # screen y is flipped
+        roll_rad = math.radians(-self._roll_deg)
         cx = W / 2
+        _NEAR = 5.0     # metres — near-clip plane
 
         rwy_hdg_rad = math.radians(float(rwy.get("heading_deg", 0)))
         t_lat = float(rwy.get("threshold_lat", 0.0))
         t_lon = float(rwy.get("threshold_lon", 0.0))
         length_ft = float(rwy.get("length_ft", 5000.0))
         elev_ft = float(rwy.get("elevation_ft", 0.0))
-        half_width_ft = 75.0   # ~150 ft standard
+        half_width_ft = 75.0   # 150 ft total — standard for a large runway
 
-        # Build 4 corners of the runway slab
-        def offset(lat: float, lon: float, dist_ft: float, bearing_rad: float) -> tuple[float, float]:
+        # ── Compute corner world positions ────────────────────────────────────
+        def rwy_offset(lat: float, lon: float, dist_ft: float, brg_rad: float) -> tuple[float, float]:
             d_m = dist_ft * 0.3048
-            d_lat = d_m * math.cos(bearing_rad) / 111_320.0
-            d_lon = d_m * math.sin(bearing_rad) / (111_320.0 * math.cos(math.radians(lat)))
+            d_lat = d_m * math.cos(brg_rad) / 111_320.0
+            d_lon = d_m * math.sin(brg_rad) / (111_320.0 * math.cos(math.radians(lat)))
             return lat + d_lat, lon + d_lon
 
         perp = rwy_hdg_rad + math.pi / 2
-        tl_lat, tl_lon = offset(t_lat, t_lon, half_width_ft, perp)
-        tr_lat, tr_lon = offset(t_lat, t_lon, -half_width_ft, perp)
-        far_lat, far_lon = offset(t_lat, t_lon, length_ft, rwy_hdg_rad)
-        fl_lat, fl_lon = offset(far_lat, far_lon, half_width_ft, perp)
-        fr_lat, fr_lon = offset(far_lat, far_lon, -half_width_ft, perp)
+        tl_lat, tl_lon = rwy_offset(t_lat, t_lon,  half_width_ft, perp)
+        tr_lat, tr_lon = rwy_offset(t_lat, t_lon, -half_width_ft, perp)
+        far_lat, far_lon = rwy_offset(t_lat, t_lon, length_ft, rwy_hdg_rad)
+        fl_lat, fl_lon = rwy_offset(far_lat, far_lon,  half_width_ft, perp)
+        fr_lat, fr_lon = rwy_offset(far_lat, far_lon, -half_width_ft, perp)
 
-        corners_world = [
-            (tl_lat, tl_lon),
-            (tr_lat, tr_lon),
-            (fr_lat, fr_lon),
-            (fl_lat, fl_lon),
-        ]
-        pts = []
-        for lat, lon in corners_world:
-            p = self._project_world_point(lat, lon, elev_ft, heading_rad, pitch_rad, roll_rad, cx, horizon_cy)
+        # ── Convert all corners to body frame ─────────────────────────────────
+        tl_b = self._world_to_body(tl_lat, tl_lon, elev_ft, heading_rad, pitch_rad, roll_rad)
+        tr_b = self._world_to_body(tr_lat, tr_lon, elev_ft, heading_rad, pitch_rad, roll_rad)
+        fl_b = self._world_to_body(fl_lat, fl_lon, elev_ft, heading_rad, pitch_rad, roll_rad)
+        fr_b = self._world_to_body(fr_lat, fr_lon, elev_ft, heading_rad, pitch_rad, roll_rad)
+
+        # Reject if far end is also behind us
+        if fl_b[0] < _NEAR and fr_b[0] < _NEAR:
+            return
+
+        def clip_near(near_b: tuple, far_b: tuple) -> tuple[float, float, float]:
+            """If near_b is behind the near plane, interpolate toward far_b."""
+            if near_b[0] >= _NEAR:
+                return near_b
+            t = (_NEAR - near_b[0]) / (far_b[0] - near_b[0])
+            return (
+                _NEAR,
+                near_b[1] + t * (far_b[1] - near_b[1]),
+                near_b[2] + t * (far_b[2] - near_b[2]),
+            )
+
+        tl_b = clip_near(tl_b, fl_b)
+        tr_b = clip_near(tr_b, fr_b)
+
+        def proj(b: tuple) -> tuple[int, int] | None:
+            p = self._project_body(b[0], b[1], b[2], cx, horizon_cy)
             if p is None:
-                return     # partial clip — skip for simplicity
-            sx, sy = p
-            if not (-W <= int(sx) <= W * 2 and -H <= int(sy) <= H * 2):
-                return
-            pts.append((int(sx), int(sy)))
+                return None
+            return int(p[0]), int(p[1])
 
-        # Only draw if at least one corner is on screen
-        if any(0 <= x <= W and 0 <= y <= H for x, y in pts):
-            pygame.draw.polygon(screen, (70, 70, 70), pts)
-            pygame.draw.polygon(screen, (100, 100, 100), pts, 1)
-            # Centre-line dashes
-            mid_t = ((tl_lat + tr_lat) / 2, (tl_lon + tr_lon) / 2)
-            mid_f = ((fl_lat + fr_lat) / 2, (fl_lon + fr_lon) / 2)
-            p_t = self._project_world_point(*mid_t, elev_ft, heading_rad, pitch_rad, roll_rad, cx, horizon_cy)
-            p_f = self._project_world_point(*mid_f, elev_ft, heading_rad, pitch_rad, roll_rad, cx, horizon_cy)
-            if p_t and p_f:
-                pygame.draw.line(screen, (255, 255, 255), (int(p_t[0]), int(p_t[1])), (int(p_f[0]), int(p_f[1])), 1)
+        pts_raw = [proj(tl_b), proj(tr_b), proj(fr_b), proj(fl_b)]
+        if any(p is None for p in pts_raw):
+            return
+        pts = [p for p in pts_raw if p is not None]   # mypy narrowing
+
+        # ── Visibility check ─────────────────────────────────────────────────
+        if not any(0 <= x <= W and 0 <= y <= H for x, y in pts):
+            # Check if any corner is on an extended screen region at all
+            if not any(-W <= x <= W * 2 and -H <= y <= H * 2 for x, y in pts):
+                return
+
+        # ── Draw asphalt slab ─────────────────────────────────────────────────
+        _ASPHALT = (44, 47, 52)
+        pygame.draw.polygon(screen, _ASPHALT, pts)
+
+        # ── White edge lines ──────────────────────────────────────────────────
+        pygame.draw.line(screen, (240, 240, 240), pts[0], pts[3], 2)  # left edge (tl→fl)
+        pygame.draw.line(screen, (240, 240, 240), pts[1], pts[2], 2)  # right edge (tr→fr)
+
+        # ── Threshold piano-key bars (8 bars at near/threshold end) ──────────
+        # Only draw if the threshold (tl/tr) are on the near side of the aircraft
+        # (i.e., they were not clipped — original tl_b / tr_b had fwd >= _NEAR)
+        orig_tl = self._world_to_body(tl_lat, tl_lon, elev_ft, heading_rad, pitch_rad, roll_rad)
+        orig_tr = self._world_to_body(tr_lat, tr_lon, elev_ft, heading_rad, pitch_rad, roll_rad)
+        threshold_visible = orig_tl[0] >= _NEAR and orig_tr[0] >= _NEAR
+        if threshold_visible:
+            p_tl = proj(orig_tl)
+            p_tr = proj(orig_tr)
+            if p_tl and p_tr:
+                n_bars = 8
+                for i in range(n_bars):
+                    t0 = i / n_bars
+                    t1 = (i + 0.85) / n_bars      # leave a small gap between bars
+                    lx0 = int(p_tl[0] + t0 * (p_tr[0] - p_tl[0]))
+                    ly0 = int(p_tl[1] + t0 * (p_tr[1] - p_tl[1]))
+                    lx1 = int(p_tl[0] + t1 * (p_tr[0] - p_tl[0]))
+                    ly1 = int(p_tl[1] + t1 * (p_tr[1] - p_tl[1]))
+                    # Make bars extend ~30 ft down the runway from threshold
+                    bar_depth = 0.04   # fraction of runway length
+                    fl_p = proj(fl_b)
+                    fr_p = proj(fr_b)
+                    if fl_p and fr_p:
+                        bx0_f = int(fl_p[0] + t0 * (fr_p[0] - fl_p[0]))
+                        by0_f = int(fl_p[1] + t0 * (fr_p[1] - fl_p[1]))
+                        # near edge of bar at threshold, far edge at 4% down runway
+                        rx0 = int(lx0 * (1 - bar_depth) + bx0_f * bar_depth)
+                        ry0 = int(ly0 * (1 - bar_depth) + by0_f * bar_depth)
+                        bx1_f = int(fl_p[0] + t1 * (fr_p[0] - fl_p[0]))
+                        by1_f = int(fl_p[1] + t1 * (fr_p[1] - fl_p[1]))
+                        rx1 = int(lx1 * (1 - bar_depth) + bx1_f * bar_depth)
+                        ry1 = int(ly1 * (1 - bar_depth) + by1_f * bar_depth)
+                        bar_pts = [(lx0, ly0), (lx1, ly1), (rx1, ry1), (rx0, ry0)]
+                        if i % 2 == 0:
+                            pygame.draw.polygon(screen, (240, 240, 240), bar_pts)
+
+        # ── Touchdown zone markers (2 pairs per side, ~500–1500 ft from threshold) ──
+        for frac in (0.08, 0.16, 0.24):
+            # Left pair
+            l0 = proj(tuple(tl_b[i] + frac * (fl_b[i] - tl_b[i]) for i in range(3)))          # type: ignore[arg-type]
+            l1 = proj(tuple(tl_b[i] + (frac + 0.04) * (fl_b[i] - tl_b[i]) for i in range(3))) # type: ignore[arg-type]
+            # Right pair
+            r0 = proj(tuple(tr_b[i] + frac * (fr_b[i] - tr_b[i]) for i in range(3)))           # type: ignore[arg-type]
+            r1 = proj(tuple(tr_b[i] + (frac + 0.04) * (fr_b[i] - tr_b[i]) for i in range(3))) # type: ignore[arg-type]
+            if l0 and l1 and r0 and r1:
+                bar_w = 0.15   # fraction of half-width from edge inward
+                # Project the inner edges
+                li0 = proj(tuple(
+                    tl_b[i] * (1 - bar_w) + (tl_b[i] + (tr_b[i] - tl_b[i]) * 0.5) * bar_w  # type: ignore[misc]
+                    + frac * (fl_b[i] - tl_b[i]) for i in range(3)
+                ))
+                li1 = proj(tuple(
+                    tl_b[i] * (1 - bar_w) + (tl_b[i] + (tr_b[i] - tl_b[i]) * 0.5) * bar_w  # type: ignore[misc]
+                    + (frac + 0.04) * (fl_b[i] - tl_b[i]) for i in range(3)
+                ))
+                ri0 = proj(tuple(
+                    tr_b[i] * (1 - bar_w) + (tr_b[i] + (tl_b[i] - tr_b[i]) * 0.5) * bar_w  # type: ignore[misc]
+                    + frac * (fr_b[i] - tr_b[i]) for i in range(3)
+                ))
+                ri1 = proj(tuple(
+                    tr_b[i] * (1 - bar_w) + (tr_b[i] + (tl_b[i] - tr_b[i]) * 0.5) * bar_w  # type: ignore[misc]
+                    + (frac + 0.04) * (fr_b[i] - tr_b[i]) for i in range(3)
+                ))
+                if li0 and li1:
+                    pygame.draw.polygon(screen, (230, 230, 230), [l0, li0, li1, l1])
+                if ri0 and ri1:
+                    pygame.draw.polygon(screen, (230, 230, 230), [r0, ri0, ri1, r1])
+
+        # ── Dashed centreline ─────────────────────────────────────────────────
+        n_dashes = 12
+        for i in range(n_dashes):
+            t0 = i / n_dashes + 0.01
+            t1 = i / n_dashes + 0.055
+            mid0_b = tuple(tl_b[k] * 0.5 + tr_b[k] * 0.5 + t0 * (fl_b[k] * 0.5 + fr_b[k] * 0.5 - tl_b[k] * 0.5 - tr_b[k] * 0.5) for k in range(3))  # type: ignore[misc]
+            mid1_b = tuple(tl_b[k] * 0.5 + tr_b[k] * 0.5 + t1 * (fl_b[k] * 0.5 + fr_b[k] * 0.5 - tl_b[k] * 0.5 - tr_b[k] * 0.5) for k in range(3))  # type: ignore[misc]
+            pa = proj(mid0_b)   # type: ignore[arg-type]
+            pb = proj(mid1_b)   # type: ignore[arg-type]
+            if pa and pb:
+                pygame.draw.line(screen, (255, 255, 255), pa, pb, 2)
 
     def _draw_terrain_object(
         self,
@@ -845,8 +1033,12 @@ class CockpitView:
     def handle_event(self, event: pygame.event.Event) -> dict:
         """Process a mouse event for instrument interaction.
 
-        Handles both legacy MOUSEBUTTONDOWN (buttons 4/5) and the modern
-        MOUSEWHEEL event (pygame ≥ 2.0).  Returns a dict with any of:
+        Handles MOUSEBUTTONDOWN (buttons 1/3 for left/right click and legacy
+        4/5 scroll) and the modern MOUSEWHEEL event (pygame ≥ 2.0).
+        Left-click (button 1) and scroll-up produce an increment; right-click
+        (button 3) and scroll-down produce a decrement.
+
+        Returns a dict with any of:
           - heading_bug_delta : float  (degrees, ± with Shift for ±10)
           - baro_delta        : float  (inHg)
           - throttle_delta    : float  (percent)
@@ -857,8 +1049,15 @@ class CockpitView:
         changes: dict = {}
 
         # Determine scroll direction and cursor position
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
-            direction = 1 if event.button == 4 else -1
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button in (4, 5):          # legacy scroll wheel
+                direction = 1 if event.button == 4 else -1
+            elif event.button == 1:             # left-click → increment
+                direction = 1
+            elif event.button == 3:             # right-click → decrement
+                direction = -1
+            else:
+                return changes
             mx, my = event.pos
         elif event.type == getattr(pygame, "MOUSEWHEEL", -1):
             direction = 1 if event.y > 0 else -1   # type: ignore[attr-defined]
@@ -926,11 +1125,11 @@ class CockpitView:
         ]
 
         regions: list[tuple[int, int, int, int, str]] = [
-            (_COL_DI,  _ROW2_Y,  _INST_SIZE, _INST_SIZE, "↕ HDG BUG ±1°  (Shift ±10°)"),
-            (_COL_ALT, _ROW1_Y,  _INST_SIZE, _INST_SIZE, "↕ BARO ±0.01 inHg"),
-            (_TACH_X,  _TACH_Y,  _INST_SIZE, _INST_SIZE, "↕ THROTTLE ±5%"),
+            (_COL_DI,  _ROW2_Y,  _INST_SIZE, _INST_SIZE, "scroll/L-click ↑ R-click ↓  HDG BUG  (Shift ±10°)"),
+            (_COL_ALT, _ROW1_Y,  _INST_SIZE, _INST_SIZE, "scroll/L-click ↑ R-click ↓  BARO inHg"),
+            (_TACH_X,  _TACH_Y,  _INST_SIZE, _INST_SIZE, "scroll/L-click ↑ R-click ↓  THROTTLE"),
             *[
-                (rx, ry, rw, rh, f"↕ {rl}")
+                (rx, ry, rw, rh, f"scroll/L-click ↑ R-click ↓  {rl}")
                 for rx, ry, rw, rh, rl in radio_rows
             ],
         ]
