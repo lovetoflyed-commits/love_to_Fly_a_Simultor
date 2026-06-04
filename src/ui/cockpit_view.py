@@ -574,46 +574,58 @@ class CockpitView:
                             pygame.draw.polygon(screen, (240, 240, 240), bar_pts)
 
         # ── Touchdown zone markers (2 pairs per side, ~500–1500 ft from threshold) ──
+        def _lerp_body(
+            a: tuple[float, float, float],
+            b: tuple[float, float, float],
+            t: float,
+        ) -> tuple[float, float, float]:
+            """Linear interpolation between two body-frame points."""
+            return (a[0] + t * (b[0] - a[0]),
+                    a[1] + t * (b[1] - a[1]),
+                    a[2] + t * (b[2] - a[2]))
+
+        bar_w = 0.15   # fraction of half-width from edge inward toward centre
         for frac in (0.08, 0.16, 0.24):
-            # Left pair
-            l0 = proj(tuple(tl_b[i] + frac * (fl_b[i] - tl_b[i]) for i in range(3)))          # type: ignore[arg-type]
-            l1 = proj(tuple(tl_b[i] + (frac + 0.04) * (fl_b[i] - tl_b[i]) for i in range(3))) # type: ignore[arg-type]
-            # Right pair
-            r0 = proj(tuple(tr_b[i] + frac * (fr_b[i] - tr_b[i]) for i in range(3)))           # type: ignore[arg-type]
-            r1 = proj(tuple(tr_b[i] + (frac + 0.04) * (fr_b[i] - tr_b[i]) for i in range(3))) # type: ignore[arg-type]
-            if l0 and l1 and r0 and r1:
-                bar_w = 0.15   # fraction of half-width from edge inward
-                # Project the inner edges
-                li0 = proj(tuple(
-                    tl_b[i] * (1 - bar_w) + (tl_b[i] + (tr_b[i] - tl_b[i]) * 0.5) * bar_w  # type: ignore[misc]
-                    + frac * (fl_b[i] - tl_b[i]) for i in range(3)
-                ))
-                li1 = proj(tuple(
-                    tl_b[i] * (1 - bar_w) + (tl_b[i] + (tr_b[i] - tl_b[i]) * 0.5) * bar_w  # type: ignore[misc]
-                    + (frac + 0.04) * (fl_b[i] - tl_b[i]) for i in range(3)
-                ))
-                ri0 = proj(tuple(
-                    tr_b[i] * (1 - bar_w) + (tr_b[i] + (tl_b[i] - tr_b[i]) * 0.5) * bar_w  # type: ignore[misc]
-                    + frac * (fr_b[i] - tr_b[i]) for i in range(3)
-                ))
-                ri1 = proj(tuple(
-                    tr_b[i] * (1 - bar_w) + (tr_b[i] + (tl_b[i] - tr_b[i]) * 0.5) * bar_w  # type: ignore[misc]
-                    + (frac + 0.04) * (fr_b[i] - tr_b[i]) for i in range(3)
-                ))
-                if li0 and li1:
-                    pygame.draw.polygon(screen, (230, 230, 230), [l0, li0, li1, l1])
-                if ri0 and ri1:
-                    pygame.draw.polygon(screen, (230, 230, 230), [r0, ri0, ri1, r1])
+            # Outer corners (on left/right edges of the runway)
+            l0 = proj(_lerp_body(tl_b, fl_b, frac))
+            l1 = proj(_lerp_body(tl_b, fl_b, frac + 0.04))
+            r0 = proj(_lerp_body(tr_b, fr_b, frac))
+            r1 = proj(_lerp_body(tr_b, fr_b, frac + 0.04))
+            # Inner corners (bar_w inward from each edge toward the centreline)
+            li0 = proj(_lerp_body(
+                _lerp_body(tl_b, fl_b, frac),
+                _lerp_body(tr_b, fr_b, frac),
+                bar_w,
+            ))
+            li1 = proj(_lerp_body(
+                _lerp_body(tl_b, fl_b, frac + 0.04),
+                _lerp_body(tr_b, fr_b, frac + 0.04),
+                bar_w,
+            ))
+            ri0 = proj(_lerp_body(
+                _lerp_body(tr_b, fr_b, frac),
+                _lerp_body(tl_b, fl_b, frac),
+                bar_w,
+            ))
+            ri1 = proj(_lerp_body(
+                _lerp_body(tr_b, fr_b, frac + 0.04),
+                _lerp_body(tl_b, fl_b, frac + 0.04),
+                bar_w,
+            ))
+            if l0 and l1 and li0 and li1:
+                pygame.draw.polygon(screen, (230, 230, 230), [l0, li0, li1, l1])
+            if r0 and r1 and ri0 and ri1:
+                pygame.draw.polygon(screen, (230, 230, 230), [r0, ri0, ri1, r1])
 
         # ── Dashed centreline ─────────────────────────────────────────────────
+        near_mid_b = _lerp_body(tl_b, tr_b, 0.5)
+        far_mid_b  = _lerp_body(fl_b, fr_b, 0.5)
         n_dashes = 12
         for i in range(n_dashes):
             t0 = i / n_dashes + 0.01
             t1 = i / n_dashes + 0.055
-            mid0_b = tuple(tl_b[k] * 0.5 + tr_b[k] * 0.5 + t0 * (fl_b[k] * 0.5 + fr_b[k] * 0.5 - tl_b[k] * 0.5 - tr_b[k] * 0.5) for k in range(3))  # type: ignore[misc]
-            mid1_b = tuple(tl_b[k] * 0.5 + tr_b[k] * 0.5 + t1 * (fl_b[k] * 0.5 + fr_b[k] * 0.5 - tl_b[k] * 0.5 - tr_b[k] * 0.5) for k in range(3))  # type: ignore[misc]
-            pa = proj(mid0_b)   # type: ignore[arg-type]
-            pb = proj(mid1_b)   # type: ignore[arg-type]
+            pa = proj(_lerp_body(near_mid_b, far_mid_b, t0))
+            pb = proj(_lerp_body(near_mid_b, far_mid_b, t1))
             if pa and pb:
                 pygame.draw.line(screen, (255, 255, 255), pa, pb, 2)
 
