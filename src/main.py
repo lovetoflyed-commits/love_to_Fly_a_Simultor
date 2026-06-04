@@ -75,7 +75,7 @@ FULL_CIRCLE_DEG = 360.0
 HALF_CIRCLE_DEG = 180.0
 HEADING_BUG_STEP_SMALL_DEG = 1.0
 HEADING_BUG_STEP_LARGE_DEG = 10.0
-RUNWAY_SPAWN_OFFSET_FT = -300.0
+RUNWAY_SPAWN_OFFSET_FT = 200.0   # feet from threshold into the runway
 
 _SCENARIO_MAP = {
     "RUNWAY_START": {"name": "Runway Start SBGR 10R", "events": []},
@@ -373,7 +373,9 @@ def main() -> None:
                     running = False
 
             # ── Mouse scroll / wheel on instruments ───────────────────────
-            elif event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
+            # button 4/5 = legacy scroll; button 1 = left-click increment;
+            # button 3 = right-click decrement; MOUSEWHEEL = modern scroll
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button in (1, 3, 4, 5):
                 _apply_instrument_changes(cockpit.handle_event(event))
 
             # Support modern pygame MOUSEWHEEL event (pygame ≥ 2.0)
