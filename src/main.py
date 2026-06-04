@@ -30,7 +30,7 @@ if __package__ in {None, ""}:
     from src.scenarios.scenario_engine import ScenarioEngine
     from src.scenarios.training_scenarios import (
         ILS_APPROACH, ENGINE_FAILURE_SCENARIO, HOLDING_PATTERN,
-        PARTIAL_PANEL, MISSED_APPROACH, DIVERSION,
+        PARTIAL_PANEL, MISSED_APPROACH, DIVERSION, TERRAIN_AWARENESS_SBGR,
     )
     from src.ui.cockpit_view import CockpitView
     from src.ui.hud import HUD
@@ -58,7 +58,7 @@ else:
     from .scenarios.scenario_engine import ScenarioEngine
     from .scenarios.training_scenarios import (
         ILS_APPROACH, ENGINE_FAILURE_SCENARIO, HOLDING_PATTERN,
-        PARTIAL_PANEL, MISSED_APPROACH, DIVERSION,
+        PARTIAL_PANEL, MISSED_APPROACH, DIVERSION, TERRAIN_AWARENESS_SBGR,
     )
     from .ui.cockpit_view import CockpitView
     from .ui.hud import HUD
@@ -83,6 +83,7 @@ _SCENARIO_MAP = {
     "PARTIAL_PANEL": PARTIAL_PANEL,
     "MISSED_APPROACH": MISSED_APPROACH,
     "DIVERSION": DIVERSION,
+    "TERRAIN_AWARENESS_SBGR": TERRAIN_AWARENESS_SBGR,
 }
 
 # Radio tuning step sizes
@@ -500,6 +501,9 @@ def main() -> None:
             "nearby_runways": _nearby_runway_dicts(airport_db, fdm),
             "terrain_ft": terrain.get_elevation_ft(
                 fdm.position.latitude_deg, fdm.position.longitude_deg
+            ),
+            "terrain_objects": terrain.get_objects_in_range(
+                fdm.position.latitude_deg, fdm.position.longitude_deg, 40.0
             ),
             # Phase 4: radio
             "com1_mhz": com1_mhz,

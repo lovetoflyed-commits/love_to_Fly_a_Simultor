@@ -15,6 +15,7 @@ class NavDisplay(Instrument):
         self.active_leg = 0
         self.bearing = 0.0
         self.distance = 0.0
+        self.terrain_objects: list = []
 
     def update(self, state: dict) -> None:
         self.position = state.get("position", self.position)
@@ -22,6 +23,7 @@ class NavDisplay(Instrument):
         self.active_leg = int(state.get("active_leg", 0))
         self.bearing = float(state.get("bearing_to_next_deg", 0.0))
         self.distance = float(state.get("distance_to_next_nm", 0.0))
+        self.terrain_objects = state.get("terrain_objects", [])
 
     def draw(self) -> pygame.Surface:
         self.surface.fill((26, 26, 26))
@@ -31,6 +33,30 @@ class NavDisplay(Instrument):
             pygame.draw.line(self.surface, (45, 45, 45), (0, y), (self.width, y))
         center = pygame.Vector2(self.width / 2, self.height / 2)
         scale = 8.0
+
+        # ── Terrain objects ───────────────────────────────────────────────────
+        for obj in self.terrain_objects:
+            dlat = (obj.lat - self.position.latitude_deg) * 60.0
+            dlon = (obj.lon - self.position.longitude_deg) * 60.0 * math.cos(math.radians(self.position.latitude_deg))
+            px = center.x + dlon * scale
+            py = center.y - dlat * scale
+            if 0 <= px <= self.width and 0 <= py <= self.height:
+                if obj.object_type == "hill":
+                    # Brown triangle for hills
+                    pygame.draw.polygon(self.surface, (140, 110, 60), [
+                        (int(px), int(py) - 5),
+                        (int(px) - 4, int(py) + 3),
+                        (int(px) + 4, int(py) + 3),
+                    ])
+                elif obj.object_type == "tower":
+                    pygame.draw.line(self.surface, (255, 80, 80), (int(px), int(py) - 5), (int(px), int(py) + 3), 2)
+                    pygame.draw.circle(self.surface, (255, 60, 60), (int(px), int(py) - 5), 2)
+                else:
+                    pygame.draw.rect(self.surface, (180, 180, 80), pygame.Rect(int(px) - 2, int(py) - 2, 5, 5))
+                lbl = self.small_font.render(obj.name, True, (160, 150, 120))
+                self.surface.blit(lbl, (int(px) + 6, int(py) - 4))
+
+        # ── Waypoints ─────────────────────────────────────────────────────────
         for idx, waypoint in enumerate(self.waypoints):
             dlat = (waypoint.lat - self.position.latitude_deg) * 60.0
             dlon = (waypoint.lon - self.position.longitude_deg) * 60.0 * math.cos(math.radians(self.position.latitude_deg))

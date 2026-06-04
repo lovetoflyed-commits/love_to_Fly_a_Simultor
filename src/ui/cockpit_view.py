@@ -121,6 +121,7 @@ class CockpitView:
         self._squawk = 1200
         self._nearest_airport = "---"
         self._terrain_ft = 0.0
+        self._terrain_objects: list = []
 
     # ── Public API ─────────────────────────────────────────────────────────
 
@@ -164,6 +165,7 @@ class CockpitView:
         self._squawk = int(state.get("squawk", self._squawk))
         self._nearest_airport = str(state.get("nearest_airport", "---"))
         self._terrain_ft = float(state.get("terrain_ft", 0.0))
+        self._terrain_objects = state.get("terrain_objects", [])
         self.atc_messages = [
             m.text if hasattr(m, "text") else str(m)
             for m in state.get("atc_messages", [])
@@ -278,6 +280,13 @@ class CockpitView:
         # ── Runway rendering ─────────────────────────────────────────────────
         for rwy in self._runways:
             self._draw_runway(screen, rwy, W, H, horizon_cy)
+
+        # ── Terrain objects (hills, towers) ──────────────────────────────────
+        heading_rad = math.radians(self._heading_deg)
+        pitch_rad = math.radians(self._pitch_deg)
+        roll_rad = math.radians(-self._roll_deg)
+        for obj in self._terrain_objects:
+            self._draw_terrain_object(screen, obj, W, H, horizon_cy, heading_rad, pitch_rad, roll_rad, cx)
 
         # Horizon line
         pygame.draw.line(screen, (230, 220, 190), (int(hl_x), int(hl_y)), (int(hr_x), int(hr_y)), 2)
@@ -419,6 +428,70 @@ class CockpitView:
             p_f = self._project_world_point(*mid_f, elev_ft, heading_rad, pitch_rad, roll_rad, cx, horizon_cy)
             if p_t and p_f:
                 pygame.draw.line(screen, (255, 255, 255), (int(p_t[0]), int(p_t[1])), (int(p_f[0]), int(p_f[1])), 1)
+
+    def _draw_terrain_object(
+        self,
+        screen: pygame.Surface,
+        obj: object,
+        W: int,
+        H: int,
+        horizon_cy: float,
+        heading_rad: float,
+        pitch_rad: float,
+        roll_rad: float,
+        cx: float,
+    ) -> None:
+        """Draw a terrain object (hill silhouette or tower) in the windshield view."""
+        lat = float(obj.lat)  # type: ignore[attr-defined]
+        lon = float(obj.lon)  # type: ignore[attr-defined]
+        base_ft = float(obj.base_elevation_ft)  # type: ignore[attr-defined]
+        top_ft = float(obj.top_elevation_ft)  # type: ignore[attr-defined]
+        obj_type: str = obj.object_type  # type: ignore[attr-defined]
+        name: str = obj.name  # type: ignore[attr-defined]
+
+        p_top = self._project_world_point(lat, lon, top_ft, heading_rad, pitch_rad, roll_rad, cx, horizon_cy)
+        if p_top is None:
+            return
+        sx_top, sy_top = p_top
+
+        if obj_type == "hill":
+            # Draw a mountain silhouette as a filled triangle above the horizon
+            p_base_l = self._project_world_point(lat - 0.04, lon - 0.04, base_ft, heading_rad, pitch_rad, roll_rad, cx, horizon_cy)
+            p_base_r = self._project_world_point(lat + 0.04, lon + 0.04, base_ft, heading_rad, pitch_rad, roll_rad, cx, horizon_cy)
+            if p_base_l is None or p_base_r is None:
+                return
+            pts = [
+                (int(p_base_l[0]), int(p_base_l[1])),
+                (int(sx_top), int(sy_top)),
+                (int(p_base_r[0]), int(p_base_r[1])),
+            ]
+            # Only draw if at least the peak is somewhere near the screen
+            if not (-W <= sx_top <= W * 2 and -H * 2 <= sy_top <= H * 2):
+                return
+            hill_color = (110, 100, 80) if base_ft < 3500 else (140, 130, 120)
+            pygame.draw.polygon(screen, hill_color, pts)
+            pygame.draw.polygon(screen, (160, 150, 130), pts, 1)
+            # Label near peak if on screen
+            if 0 <= int(sx_top) <= W and 0 <= int(sy_top) <= H and hasattr(self, "info_font"):
+                lbl = self.info_font.render(name, True, (240, 230, 200))
+                screen.blit(lbl, (int(sx_top) + 4, int(sy_top) - 12))
+        else:
+            # Tower / building: draw a vertical line from base to top
+            p_base = self._project_world_point(lat, lon, base_ft, heading_rad, pitch_rad, roll_rad, cx, horizon_cy)
+            if p_base is None:
+                return
+            sx_base, sy_base = p_base
+            if not (-W <= sx_top <= W * 2 and -H * 2 <= sy_top <= H * 2):
+                return
+            color = (255, 80, 80) if obj_type == "tower" else (200, 200, 100)
+            pygame.draw.line(screen, color, (int(sx_base), int(sy_base)), (int(sx_top), int(sy_top)), 2)
+            # Antenna cap for towers
+            if obj_type == "tower":
+                pygame.draw.circle(screen, (255, 60, 60), (int(sx_top), int(sy_top)), 3)
+            # Label if on-screen
+            if 0 <= int(sx_top) <= W and 0 <= int(sy_top) <= H and hasattr(self, "info_font"):
+                lbl = self.info_font.render(name, True, (255, 180, 180))
+                screen.blit(lbl, (int(sx_top) + 4, int(sy_top) - 10))
 
     def _draw_cloud_layer(self, screen: pygame.Surface, W: int, H: int, horizon_cy: float) -> None:
         """Draw a solid cloud overcast layer at the weather ceiling."""
